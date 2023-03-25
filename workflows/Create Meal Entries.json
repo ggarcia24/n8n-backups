@@ -1,0 +1,246 @@
+{
+  "active": false,
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Lunch",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Breakfast",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merienda",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Dinner",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "createdAt": "2023-03-24T23:26:44.780Z",
+  "id": "2",
+  "name": "Create Meal Entries",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {}
+          ]
+        }
+      },
+      "id": "30f96c98-08c1-400f-a05b-ee1ada68944a",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [
+        340,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "databaseId": {
+          "__rl": true,
+          "value": "23e27bbf-a485-4f28-b5e8-11740d8d0e15",
+          "mode": "list",
+          "cachedResultName": "Meal Logs",
+          "cachedResultUrl": "https://www.notion.so/23e27bbfa4854f28b5e811740d8d0e15"
+        },
+        "title": "={{ $json[\"Day of month\"] }}{{ $json.Month.toUpperCase().slice(0,3) }}{{ $json.Year }} - Breakfast",
+        "propertiesUi": {
+          "propertyValues": [
+            {
+              "key": "Meal|select",
+              "selectValue": "Breakfast"
+            },
+            {
+              "key": "Planned Date|date",
+              "includeTime": false,
+              "date": "={{ $json.timestamp }}",
+              "timezone": "=default"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "4b3f4566-a5dc-48e1-b7a7-ab071ee03a3e",
+      "name": "Breakfast",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2,
+      "position": [
+        580,
+        160
+      ],
+      "credentials": {
+        "notionApi": {
+          "id": "3",
+          "name": "Notion account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "databaseId": {
+          "__rl": true,
+          "value": "23e27bbf-a485-4f28-b5e8-11740d8d0e15",
+          "mode": "list",
+          "cachedResultName": "Meal Logs",
+          "cachedResultUrl": "https://www.notion.so/23e27bbfa4854f28b5e811740d8d0e15"
+        },
+        "title": "={{ $json[\"Day of month\"] }}{{ $json.Month.toUpperCase().slice(0,3) }}{{ $json.Year }} - Lunch",
+        "propertiesUi": {
+          "propertyValues": [
+            {
+              "key": "Meal|select",
+              "selectValue": "Lunch"
+            },
+            {
+              "key": "Planned Date|date",
+              "includeTime": false,
+              "date": "={{ $json.timestamp }}",
+              "timezone": "=default"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "e9fb4760-db40-4947-b9e1-e258a93c5f88",
+      "name": "Lunch",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2,
+      "position": [
+        580,
+        340
+      ],
+      "credentials": {
+        "notionApi": {
+          "id": "3",
+          "name": "Notion account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "databaseId": {
+          "__rl": true,
+          "value": "23e27bbf-a485-4f28-b5e8-11740d8d0e15",
+          "mode": "list",
+          "cachedResultName": "Meal Logs",
+          "cachedResultUrl": "https://www.notion.so/23e27bbfa4854f28b5e811740d8d0e15"
+        },
+        "title": "={{ $json[\"Day of month\"] }}{{ $json.Month.toUpperCase().slice(0,3) }}{{ $json.Year }} - Merienda",
+        "propertiesUi": {
+          "propertyValues": [
+            {
+              "key": "Meal|select",
+              "selectValue": "Merienda"
+            },
+            {
+              "key": "Planned Date|date",
+              "includeTime": false,
+              "date": "={{ $json.timestamp }}",
+              "timezone": "=default"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "606ff39e-7150-42f2-af80-84218ba42405",
+      "name": "Merienda",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2,
+      "position": [
+        580,
+        520
+      ],
+      "credentials": {
+        "notionApi": {
+          "id": "3",
+          "name": "Notion account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "databaseId": {
+          "__rl": true,
+          "value": "23e27bbf-a485-4f28-b5e8-11740d8d0e15",
+          "mode": "list",
+          "cachedResultName": "Meal Logs",
+          "cachedResultUrl": "https://www.notion.so/23e27bbfa4854f28b5e811740d8d0e15"
+        },
+        "title": "={{ $json[\"Day of month\"] }}{{ $json.Month.toUpperCase().slice(0,3) }}{{ $json.Year }} - Dinner",
+        "propertiesUi": {
+          "propertyValues": [
+            {
+              "key": "Meal|select",
+              "selectValue": "Dinner"
+            },
+            {
+              "key": "Planned Date|date",
+              "includeTime": false,
+              "date": "={{ $json.timestamp }}",
+              "timezone": "=default"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "db355af6-1533-4400-a265-80a75952c709",
+      "name": "Dinner",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2,
+      "position": [
+        580,
+        700
+      ],
+      "credentials": {
+        "notionApi": {
+          "id": "3",
+          "name": "Notion account"
+        }
+      }
+    }
+  ],
+  "pinData": {
+    "Schedule Trigger": [
+      {
+        "json": {
+          "timestamp": "2023-03-24T18:39:51.537-04:00",
+          "Readable date": "March 24th 2023, 6:39:51 pm",
+          "Readable time": "6:39:51 pm",
+          "Day of week": "Friday",
+          "Year": "2023",
+          "Month": "March",
+          "Day of month": "24",
+          "Hour": "18",
+          "Minute": "39",
+          "Second": "51",
+          "Timezone": "EDT -04:00"
+        }
+      }
+    ]
+  },
+  "settings": {},
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 0,
+  "updatedAt": "2023-03-24T23:27:00.000Z",
+  "versionId": "16225364-e05c-4256-bfff-d34d4697ac22"
+}
