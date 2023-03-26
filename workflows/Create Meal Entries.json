@@ -1,16 +1,145 @@
 {
-  "active": false,
+  "active": true,
   "connections": {
     "Schedule Trigger": {
       "main": [
         [
           {
-            "node": "Lunch",
+            "node": "Date & Time",
             "type": "main",
             "index": 0
           },
           {
+            "node": "Date & Time1",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Date & Time2",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Date & Time3",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Date & Time4",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Date & Time5",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Date & Time6",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Date & Time": {
+      "main": [
+        [
+          {
+            "node": "Item Lists",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Date & Time1": {
+      "main": [
+        [
+          {
+            "node": "Item Lists",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Date & Time2": {
+      "main": [
+        [
+          {
+            "node": "Item Lists",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Date & Time3": {
+      "main": [
+        [
+          {
+            "node": "Item Lists",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Date & Time4": {
+      "main": [
+        [
+          {
+            "node": "Item Lists",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Date & Time5": {
+      "main": [
+        [
+          {
+            "node": "Item Lists",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Date & Time6": {
+      "main": [
+        [
+          {
+            "node": "Item Lists",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Item Lists": {
+      "main": [
+        [
+          {
+            "node": "Code1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code1": {
+      "main": [
+        [
+          {
             "node": "Breakfast",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Lunch",
             "type": "main",
             "index": 0
           },
@@ -36,7 +165,10 @@
       "parameters": {
         "rule": {
           "interval": [
-            {}
+            {
+              "field": "weeks",
+              "triggerAtHour": 5
+            }
           ]
         }
       },
@@ -45,9 +177,11 @@
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1,
       "position": [
-        340,
-        400
-      ]
+        -120,
+        580
+      ],
+      "retryOnFail": false,
+      "continueOnFail": true
     },
     {
       "parameters": {
@@ -59,7 +193,7 @@
           "cachedResultName": "Meal Logs",
           "cachedResultUrl": "https://www.notion.so/23e27bbfa4854f28b5e811740d8d0e15"
         },
-        "title": "={{ $json[\"Day of month\"] }}{{ $json.Month.toUpperCase().slice(0,3) }}{{ $json.Year }} - Breakfast",
+        "title": "={{ $json.meal_prefix }} - Breakfast ",
         "propertiesUi": {
           "propertyValues": [
             {
@@ -69,7 +203,7 @@
             {
               "key": "Planned Date|date",
               "includeTime": false,
-              "date": "={{ $json.timestamp }}",
+              "date": "={{ $json.iso_date }}",
               "timezone": "=default"
             }
           ]
@@ -81,8 +215,8 @@
       "type": "n8n-nodes-base.notion",
       "typeVersion": 2,
       "position": [
-        580,
-        160
+        1040,
+        260
       ],
       "credentials": {
         "notionApi": {
@@ -101,7 +235,7 @@
           "cachedResultName": "Meal Logs",
           "cachedResultUrl": "https://www.notion.so/23e27bbfa4854f28b5e811740d8d0e15"
         },
-        "title": "={{ $json[\"Day of month\"] }}{{ $json.Month.toUpperCase().slice(0,3) }}{{ $json.Year }} - Lunch",
+        "title": "={{ $json.meal_prefix }} - Lunch",
         "propertiesUi": {
           "propertyValues": [
             {
@@ -111,7 +245,7 @@
             {
               "key": "Planned Date|date",
               "includeTime": false,
-              "date": "={{ $json.timestamp }}",
+              "date": "={{ $json.iso_date }}",
               "timezone": "=default"
             }
           ]
@@ -123,8 +257,8 @@
       "type": "n8n-nodes-base.notion",
       "typeVersion": 2,
       "position": [
-        580,
-        340
+        1040,
+        460
       ],
       "credentials": {
         "notionApi": {
@@ -143,7 +277,7 @@
           "cachedResultName": "Meal Logs",
           "cachedResultUrl": "https://www.notion.so/23e27bbfa4854f28b5e811740d8d0e15"
         },
-        "title": "={{ $json[\"Day of month\"] }}{{ $json.Month.toUpperCase().slice(0,3) }}{{ $json.Year }} - Merienda",
+        "title": "={{ $json.meal_prefix }} - Merienda",
         "propertiesUi": {
           "propertyValues": [
             {
@@ -153,7 +287,7 @@
             {
               "key": "Planned Date|date",
               "includeTime": false,
-              "date": "={{ $json.timestamp }}",
+              "date": "={{ $json.iso_date }}",
               "timezone": "=default"
             }
           ]
@@ -165,8 +299,8 @@
       "type": "n8n-nodes-base.notion",
       "typeVersion": 2,
       "position": [
-        580,
-        520
+        1040,
+        660
       ],
       "credentials": {
         "notionApi": {
@@ -185,7 +319,7 @@
           "cachedResultName": "Meal Logs",
           "cachedResultUrl": "https://www.notion.so/23e27bbfa4854f28b5e811740d8d0e15"
         },
-        "title": "={{ $json[\"Day of month\"] }}{{ $json.Month.toUpperCase().slice(0,3) }}{{ $json.Year }} - Dinner",
+        "title": "={{ $json.meal_prefix }} - Dinner",
         "propertiesUi": {
           "propertyValues": [
             {
@@ -195,7 +329,7 @@
             {
               "key": "Planned Date|date",
               "includeTime": false,
-              "date": "={{ $json.timestamp }}",
+              "date": "={{ $json.iso_date }}",
               "timezone": "=default"
             }
           ]
@@ -207,8 +341,8 @@
       "type": "n8n-nodes-base.notion",
       "typeVersion": 2,
       "position": [
-        580,
-        700
+        1040,
+        840
       ],
       "credentials": {
         "notionApi": {
@@ -216,31 +350,173 @@
           "name": "Notion account"
         }
       }
+    },
+    {
+      "parameters": {
+        "action": "calculate",
+        "value": "={{ $json.timestamp }}",
+        "duration": 1,
+        "dataPropertyName": "new_date",
+        "options": {
+          "fromFormat": ""
+        }
+      },
+      "id": "f8253a0f-da48-4b5e-8490-5fbc6187001b",
+      "name": "Date & Time",
+      "type": "n8n-nodes-base.dateTime",
+      "typeVersion": 1,
+      "position": [
+        260,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "action": "calculate",
+        "value": "={{ $json.timestamp }}",
+        "duration": 2,
+        "dataPropertyName": "new_date",
+        "options": {}
+      },
+      "id": "0a8c5134-f1b9-4ee6-9d3b-dc734bc709ad",
+      "name": "Date & Time1",
+      "type": "n8n-nodes-base.dateTime",
+      "typeVersion": 1,
+      "position": [
+        260,
+        260
+      ]
+    },
+    {
+      "parameters": {
+        "action": "calculate",
+        "value": "={{ $json.timestamp }}",
+        "duration": 3,
+        "dataPropertyName": "new_date",
+        "options": {}
+      },
+      "id": "a81f264f-de99-495e-be98-02e12e621457",
+      "name": "Date & Time2",
+      "type": "n8n-nodes-base.dateTime",
+      "typeVersion": 1,
+      "position": [
+        260,
+        420
+      ]
+    },
+    {
+      "parameters": {
+        "action": "calculate",
+        "value": "={{ $json.timestamp }}",
+        "duration": 4,
+        "dataPropertyName": "new_date",
+        "options": {}
+      },
+      "id": "0f8a4b9b-521b-4a66-9713-1f2eeed3d642",
+      "name": "Date & Time3",
+      "type": "n8n-nodes-base.dateTime",
+      "typeVersion": 1,
+      "position": [
+        260,
+        580
+      ]
+    },
+    {
+      "parameters": {
+        "action": "calculate",
+        "value": "={{ $json.timestamp }}",
+        "duration": 5,
+        "dataPropertyName": "new_date",
+        "options": {}
+      },
+      "id": "92d7cb15-8b85-4e52-8da4-486ded0a50c9",
+      "name": "Date & Time4",
+      "type": "n8n-nodes-base.dateTime",
+      "typeVersion": 1,
+      "position": [
+        260,
+        740
+      ]
+    },
+    {
+      "parameters": {
+        "action": "calculate",
+        "value": "={{ $json.timestamp }}",
+        "duration": 6,
+        "dataPropertyName": "new_date",
+        "options": {}
+      },
+      "id": "8f09be22-dd54-400c-ad73-e7ef672c51cb",
+      "name": "Date & Time5",
+      "type": "n8n-nodes-base.dateTime",
+      "typeVersion": 1,
+      "position": [
+        260,
+        900
+      ]
+    },
+    {
+      "parameters": {
+        "action": "calculate",
+        "value": "={{ $json.timestamp }}",
+        "duration": 7,
+        "dataPropertyName": "new_date",
+        "options": {}
+      },
+      "id": "1e620307-4326-4c45-b00b-c78b6d16300c",
+      "name": "Date & Time6",
+      "type": "n8n-nodes-base.dateTime",
+      "typeVersion": 1,
+      "position": [
+        260,
+        1060
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "sort",
+        "sortFieldsUi": {
+          "sortField": [
+            {
+              "fieldName": "new_date"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "1c8e6fbb-39eb-4f31-b839-63b43d29da7d",
+      "name": "Item Lists",
+      "type": "n8n-nodes-base.itemLists",
+      "typeVersion": 2,
+      "position": [
+        560,
+        580
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const new_date = DateTime.fromISO($input.item.json.new_date);\n$input.item.json = {\n  iso_date: new_date.toISODate(),\n  meal_prefix: new_date.toFormat('ddMMMyyyy').toUpperCase()\n};\nreturn $input.item;"
+      },
+      "id": "81418a28-1648-4b7c-a637-33116d3a522e",
+      "name": "Code1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [
+        780,
+        580
+      ]
     }
   ],
-  "pinData": {
-    "Schedule Trigger": [
-      {
-        "json": {
-          "timestamp": "2023-03-24T18:39:51.537-04:00",
-          "Readable date": "March 24th 2023, 6:39:51 pm",
-          "Readable time": "6:39:51 pm",
-          "Day of week": "Friday",
-          "Year": "2023",
-          "Month": "March",
-          "Day of month": "24",
-          "Hour": "18",
-          "Minute": "39",
-          "Second": "51",
-          "Timezone": "EDT -04:00"
-        }
-      }
-    ]
-  },
+  "pinData": {},
   "settings": {},
-  "staticData": null,
+  "staticData": {
+    "node:Schedule Trigger": {
+      "recurrencyRules": []
+    }
+  },
   "tags": [],
-  "triggerCount": 0,
-  "updatedAt": "2023-03-24T23:27:00.000Z",
-  "versionId": "16225364-e05c-4256-bfff-d34d4697ac22"
+  "triggerCount": 1,
+  "updatedAt": "2023-03-26T19:36:53.000Z",
+  "versionId": "8ba959cb-e306-4d55-9b52-22523b6eb843"
 }
