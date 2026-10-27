@@ -1,0 +1,280 @@
+{
+  "active": true,
+  "activeVersion": {
+    "versionId": "a35deb04-2725-4fea-a6e1-b59d09d47252",
+    "workflowId": "2GN7mz2z9WCtSJAp",
+    "nodes": [
+      {
+        "parameters": {},
+        "type": "n8n-nodes-base.errorTrigger",
+        "typeVersion": 1,
+        "position": [
+          -480,
+          -32
+        ],
+        "id": "d2081c20-4330-4464-b3dd-84473c8af987",
+        "name": "Error Trigger"
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "options": {
+              "caseSensitive": true,
+              "leftValue": "",
+              "typeValidation": "strict",
+              "version": 4
+            },
+            "conditions": [
+              {
+                "id": "3096618a-b524-4cab-95d6-f6a5fc0803f5",
+                "leftValue": "",
+                "rightValue": "",
+                "operator": {
+                  "type": "string",
+                  "operation": "equals",
+                  "name": "filter.operator.equals"
+                }
+              }
+            ],
+            "combinator": "and"
+          },
+          "options": {}
+        },
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2.4,
+        "position": [
+          -240,
+          -32
+        ],
+        "id": "73c28a69-5b21-4251-93c7-6c09e72c8f8c",
+        "name": "If"
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "https://notify.ggarcia24.work/phone_alerts",
+          "authentication": "genericCredentialType",
+          "genericAuthType": "httpBearerAuth",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "X-Priority",
+                "value": "5"
+              },
+              {
+                "name": "X-Tags",
+                "value": "bangbang"
+              },
+              {
+                "name": "X-Title",
+                "value": "={{ $json.workflow.name }}: Execution {{ $json.execution.id }}"
+              },
+              {
+                "name": "X-Icon",
+                "value": "https://cdn.brandfetch.io/idO6_6uqJ9/w/600/h/600/theme/dark/symbol.png?c=1dxbfHSJFAPEGdCLU4o5B"
+              }
+            ]
+          },
+          "sendBody": true,
+          "contentType": "raw",
+          "body": "={{ $json.execution.error }}",
+          "options": {}
+        },
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.5,
+        "position": [
+          -16,
+          -128
+        ],
+        "id": "03632287-f8a1-49da-9cf3-2859130d7fef",
+        "name": "HTTP Request",
+        "credentials": {
+          "httpBearerAuth": {
+            "id": "qICXH0s3niRMKXoP",
+            "name": "NTFY Token"
+          }
+        }
+      }
+    ],
+    "connections": {
+      "Error Trigger": {
+        "main": [
+          [
+            {
+              "node": "If",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "If": {
+        "main": [
+          [
+            {
+              "node": "HTTP Request",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "nodeGroups": [],
+    "authors": "Gonzalo Garcia",
+    "name": "Error Notification Workflow",
+    "description": null,
+    "autosaved": true,
+    "createdAt": "2026-10-26T01:24:48.711Z",
+    "updatedAt": "2026-10-26T01:25:47.000Z"
+  },
+  "activeVersionId": "a35deb04-2725-4fea-a6e1-b59d09d47252",
+  "connections": {
+    "Error Trigger": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "createdAt": "2026-10-26T00:25:41.464Z",
+  "id": "2GN7mz2z9WCtSJAp",
+  "isArchived": false,
+  "meta": null,
+  "name": "Error Notification Workflow",
+  "nodeGroups": [],
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        -608,
+        -128
+      ],
+      "id": "d2081c20-4330-4464-b3dd-84473c8af987",
+      "name": "Error Trigger"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 4
+          },
+          "conditions": [
+            {
+              "id": "3096618a-b524-4cab-95d6-f6a5fc0803f5",
+              "leftValue": "true",
+              "rightValue": "true",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.4,
+      "position": [
+        -336,
+        -128
+      ],
+      "id": "73c28a69-5b21-4251-93c7-6c09e72c8f8c",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://notify.ggarcia24.work/phone_alerts",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Priority",
+              "value": "5"
+            },
+            {
+              "name": "X-Tags",
+              "value": "bangbang"
+            },
+            {
+              "name": "X-Title",
+              "value": "={{ $json.workflow.name }}: Execution {{ $json.execution.id }}"
+            },
+            {
+              "name": "X-Icon",
+              "value": "https://cdn.brandfetch.io/idO6_6uqJ9/w/600/h/600/theme/dark/symbol.png?c=1dxbfHSJFAPEGdCLU4o5B"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "body": "={{ $json.execution.lastNodeExecuted }}\n\n{{ $json.execution.error.message }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        -32,
+        -304
+      ],
+      "id": "03632287-f8a1-49da-9cf3-2859130d7fef",
+      "name": "HTTP Request",
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "qICXH0s3niRMKXoP",
+          "name": "NTFY Token"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "repo_name": "n8n-backups",
+  "repo_owner": "ggarcia24",
+  "repo_path": "workflows/",
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": true
+  },
+  "shared": [
+    {
+      "role": "workflow:owner",
+      "workflowId": "2GN7mz2z9WCtSJAp",
+      "projectId": "53XBnFAeVo99S8g5",
+      "createdAt": "2026-10-26T00:25:41.465Z",
+      "updatedAt": "2026-10-26T00:25:41.465Z"
+    }
+  ],
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 0,
+  "updatedAt": "2026-10-26T01:38:02.417Z",
+  "versionId": "3554bbd6-4de5-4f91-89c6-af7dacac8d72"
+}
