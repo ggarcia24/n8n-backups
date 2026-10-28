@@ -1,0 +1,1194 @@
+{
+  "active": true,
+  "activeVersion": {
+    "versionId": "521e84e6-7a72-43d2-abee-22a400b62047",
+    "workflowId": "X8ziv1mJ0BoORpSf",
+    "nodes": [
+      {
+        "parameters": {},
+        "id": "8fa64454-c0cb-4026-b0e5-85c92d83b7d7",
+        "name": "Manual preview",
+        "type": "n8n-nodes-base.manualTrigger",
+        "typeVersion": 1,
+        "position": [
+          0,
+          0
+        ]
+      },
+      {
+        "parameters": {
+          "rule": {
+            "interval": [
+              {
+                "triggerAtHour": 22,
+                "triggerAtMinute": 30
+              }
+            ]
+          }
+        },
+        "id": "d142090a-672f-4d56-a030-eed908650908",
+        "name": "Hourly reconciliation",
+        "type": "n8n-nodes-base.scheduleTrigger",
+        "typeVersion": 1.3,
+        "position": [
+          0,
+          192
+        ]
+      },
+      {
+        "parameters": {
+          "assignments": {
+            "assignments": [
+              {
+                "id": "b58bb388-40f6-4ef9-b0ac-cd215dc52b5c",
+                "name": "sparkyBaseUrl",
+                "value": "https://fitness.ggarcia24.site",
+                "type": "string"
+              },
+              {
+                "id": "67abf7a6-2787-4573-b8a5-9c1d3873da56",
+                "name": "obsidianBaseUrl",
+                "value": "https://obsidian.ggarcia24.work",
+                "type": "string"
+              },
+              {
+                "id": "2019c70b-82f5-4724-a66f-be1af75fbc03",
+                "name": "timezone",
+                "value": "Europe/Madrid",
+                "type": "string"
+              },
+              {
+                "id": "e5ca06ad-3247-455a-87db-fb9f15948bb5",
+                "name": "lookbackDays",
+                "value": 7,
+                "type": "number"
+              },
+              {
+                "id": "05f008e6-a842-42e4-bf04-7ab3ccab91e3",
+                "name": "endDateOverride",
+                "value": "",
+                "type": "string"
+              },
+              {
+                "id": "bb28e27b-faee-4223-aa40-69c10b8a57eb",
+                "name": "previewOnly",
+                "value": false,
+                "type": "boolean"
+              },
+              {
+                "id": "14a8b92f-96e5-4494-bd31-08b6591e0da2",
+                "name": "createMissingNotes",
+                "value": true,
+                "type": "boolean"
+              },
+              {
+                "id": "7de21692-cbf8-4e1d-86fc-d9515720ba86",
+                "name": "dailyTemplatePath",
+                "value": "_templates/daily_note.md",
+                "type": "string"
+              },
+              {
+                "id": "65960eb8-a578-4bce-bfa6-5a190154e3e6",
+                "name": "sleepSource",
+                "value": "",
+                "type": "string"
+              }
+            ]
+          },
+          "options": {}
+        },
+        "id": "def4e4a1-90d0-4299-8ebf-2ac699828498",
+        "name": "Settings",
+        "type": "n8n-nodes-base.set",
+        "typeVersion": 3.4,
+        "position": [
+          240,
+          80
+        ]
+      },
+      {
+        "parameters": {
+          "jsCode": "\nreturn (function buildSourceRequests() {\n  const config = { ...$input.first().json };\n  for (const key of ['sparkyBaseUrl', 'obsidianBaseUrl']) {\n    if (typeof config[key] !== 'string' ||\n        !/^https:\\/\\/(?:[A-Za-z0-9.-]+|\\[[A-Fa-f0-9:]+\\])(?::[0-9]{1,5})?\\/?$/.test(config[key])) {\n      throw new Error(`${key} must be an HTTPS origin without credentials, path, query, or fragment.`);\n    }\n    config[key] = config[key].replace(/\\/+$/, '');\n  }\n  if (!Number.isInteger(config.lookbackDays) || config.lookbackDays < 1 || config.lookbackDays > 31) {\n    throw new Error('lookbackDays must be an integer from 1 to 31.');\n  }\n  if (typeof config.previewOnly !== 'boolean' || typeof config.createMissingNotes !== 'boolean') {\n    throw new Error('previewOnly and createMissingNotes must be booleans.');\n  }\n  const parts = Object.fromEntries(new Intl.DateTimeFormat('en-CA', {\n    timeZone: config.timezone, year: 'numeric', month: '2-digit', day: '2-digit',\n  }).formatToParts(new Date()).map(part => [part.type, part.value]));\n  const end = config.endDateOverride || `${parts.year}-${parts.month}-${parts.day}`;\n  const endMs = Date.parse(`${end}T00:00:00Z`);\n  if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(end) || !Number.isFinite(endMs) ||\n      new Date(endMs).toISOString().slice(0, 10) !== end) {\n    throw new Error('endDateOverride must be blank or a real YYYY-MM-DD date.');\n  }\n  const today = `${parts.year}-${parts.month}-${parts.day}`;\n  if (end > today) throw new Error('Future dates cannot be imported.');\n  if (!/^_templates\\/[^\\\\\\r\\n]+\\.md$/.test(config.dailyTemplatePath) ||\n      config.dailyTemplatePath.split('/').includes('..')) {\n    throw new Error('dailyTemplatePath must identify a Markdown file under _templates/.');\n  }\n  const requests = [];\n  for (let offset = config.lookbackDays - 1; offset >= 0; offset--) {\n    const date = new Date(endMs - offset * 86400000).toISOString().slice(0, 10);\n    const endpoints = {\n      summary: `/daily-summary?date=${date}`,\n      water: `/measurements/water-intake/${date}`,\n      measurements: `/measurements/check-in-measurements-range/${date}/${date}`,\n      sleep: `/sleep?startDate=${date}&endDate=${date}`,\n    };\n    for (const [kind, endpoint] of Object.entries(endpoints)) {\n      requests.push({ json: { config, date, kind, url: `${config.sparkyBaseUrl}/api${endpoint}` } });\n    }\n  }\n  return requests;\n})();"
+        },
+        "id": "1053444b-11b7-44da-a4f9-273a679de8b4",
+        "name": "Build source requests",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          464,
+          80
+        ]
+      },
+      {
+        "parameters": {
+          "url": "={{ $json.url }}",
+          "authentication": "genericCredentialType",
+          "genericAuthType": "httpHeaderAuth",
+          "options": {
+            "batching": {
+              "batch": {
+                "batchSize": 1
+              }
+            },
+            "redirect": {
+              "redirect": {
+                "followRedirects": false
+              }
+            },
+            "response": {
+              "response": {
+                "fullResponse": true,
+                "responseFormat": "json"
+              }
+            },
+            "timeout": 30000
+          }
+        },
+        "id": "954e3c92-d821-4a3c-a24a-9a80dc606e58",
+        "name": "Read SparkyFitness",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.3,
+        "position": [
+          704,
+          80
+        ],
+        "retryOnFail": true,
+        "maxTries": 3,
+        "waitBetweenTries": 2000,
+        "credentials": {
+          "httpHeaderAuth": {
+            "id": "kicijhQjKvp31Xfo",
+            "name": "SparkyFitness read-only"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "jsCode": "\nreturn (function normalizeSourceData() {\n  const requests = $('Build source requests').all();\n  const responses = $input.all();\n  if (responses.length !== requests.length) throw new Error('Unexpected number of SparkyFitness responses.');\n  const days = new Map();\n  const numeric = (value, label, minimum = 0) => {\n    if ((typeof value !== 'number' && typeof value !== 'string') ||\n        String(value).trim() === '' || !Number.isFinite(Number(value)) || Number(value) < minimum) {\n      throw new Error(`${label}: expected a finite number >= ${minimum}.`);\n    }\n    return Number(value);\n  };\n  const dayString = value => {\n    if (typeof value !== 'string' || !/^\\d{4}-\\d{2}-\\d{2}(?:$|T)/.test(value)) {\n      throw new Error('SparkyFitness returned an invalid entry_date.');\n    }\n    return value.slice(0, 10);\n  };\n  const round = (value, digits = 2) => Number(value.toFixed(digits));\n  const cell = value => String(value).replace(/&/g, '&amp;').replace(/</g, '&lt;')\n    .replace(/>/g, '&gt;').replace(/\\\\/g, '\\\\\\\\').replace(/[|[\\]`*_]/g, '\\\\$&')\n    .replace(/[\\r\\n]+/g, ' ');\n  for (let i = 0; i < requests.length; i++) {\n    const req = requests[i].json;\n    const res = responses[i].json;\n    if (res.statusCode !== 200 || !res.body || typeof res.body !== 'object') {\n      throw new Error(`${req.kind} ${req.date}: expected a JSON 200 response, got ${res.statusCode}.`);\n    }\n    if (!days.has(req.date)) days.set(req.date, { config: req.config, date: req.date });\n    days.get(req.date)[req.kind] = res.body;\n  }\n  return [...days.values()].map(day => {\n    const { date, config, summary, water, measurements, sleep } = day;\n    if (!Array.isArray(summary.foodEntries) || !summary.supplementTotals ||\n        !summary.calorieBalance || !Array.isArray(measurements) || !Array.isArray(sleep)) {\n      throw new Error(`${date}: response does not match SparkyFitness v1.9.0.`);\n    }\n    const fields = {};\n    const issues = [];\n    const entries = [];\n    const seen = new Map();\n    for (const entry of summary.foodEntries) {\n      if (!entry || typeof entry.id !== 'string' || dayString(entry.entry_date) !== date) {\n        throw new Error(`${date}: invalid or incorrectly dated food entry.`);\n      }\n      if (seen.has(entry.id)) {\n        if (seen.get(entry.id) !== JSON.stringify(entry)) throw new Error(`${date}: conflicting duplicate food ID.`);\n        continue;\n      }\n      seen.set(entry.id, JSON.stringify(entry));\n      entries.push(entry);\n    }\n    const nutrients = {\n      calories_kcal: 'calories', protein_g: 'protein', carbs_g: 'carbs',\n      fat_g: 'fat', fiber_g: 'dietary_fiber',\n    };\n    const supplements = summary.supplementTotals;\n    const hasSupplements = Object.values(supplements).some(value => typeof value === 'number' && value > 0) ||\n      Object.values(supplements.custom_nutrients || {}).some(value => Number(value) > 0);\n    const nutritionRecorded = entries.length > 0 || hasSupplements;\n    let calculatedCalories;\n    for (const [target, nutrient] of Object.entries(nutrients)) {\n      const supplementTotal = numeric(supplements[nutrient], `${date} supplement ${nutrient}`);\n      let total = 0;\n      let complete = true;\n      for (const entry of entries) {\n        const source = entry.calories !== undefined || Object.keys(entry.custom_nutrients || {}).length > 0\n          ? entry : entry.food_variants || (entry.foods && entry.foods.default_variant);\n        if (!source || source[nutrient] == null) {\n          complete = false;\n          continue;\n        }\n        // SparkyFitness snapshots nutrients per reference serving, not per logged quantity.\n        const reference = source.serving_size == null ? 100 : numeric(source.serving_size, 'serving_size');\n        if (reference === 0) throw new Error(`${date}: serving_size cannot be zero.`);\n        total += numeric(source[nutrient], nutrient) * numeric(entry.quantity, 'quantity') / reference;\n      }\n      total += supplementTotal;\n      if (nutritionRecorded && complete) {\n        fields[target] = round(total);\n        if (target === 'calories_kcal') calculatedCalories = total;\n      }\n      if (nutritionRecorded && !complete) issues.push(`${target} withheld: one or more food snapshots lack this nutrient.`);\n    }\n    if (calculatedCalories !== undefined) {\n      const reportedCalories = numeric(summary.calorieBalance.eaten, 'calorieBalance.eaten');\n      const roundedCalories = Math.round(calculatedCalories);\n      if (roundedCalories !== reportedCalories) {\n        throw new Error(`${date}: calculated calories disagree with SparkyFitness's daily total (calculated ${calculatedCalories} kcal; rounded ${roundedCalories} kcal; reported ${reportedCalories} kcal). No notes will be written.`);\n      }\n    }\n    const waterMl = numeric(water.water_ml, `${date} water_ml`);\n    if (waterMl > 0) fields.water_ml = round(waterMl);\n    // This endpoint returns zero even without a log; zero alone is not an observation.\n    if (waterMl === 0) issues.push('Water is unrecorded or zero; no water_ml value is inferred.');\n    for (const row of measurements) {\n      if (dayString(row.entry_date) !== date) throw new Error(`${date}: measurement belongs to another day.`);\n    }\n    for (const [target, source] of [['weight_kg', 'weight'], ['steps', 'steps']]) {\n      const values = [...new Set(measurements.filter(row => row[source] != null)\n        .map(row => numeric(row[source], `${date} ${source}`)))];\n      if (values.length > 1) {\n        issues.push(`${target} withheld: conflicting same-day check-ins.`);\n      } else if (values.length === 1) {\n        if (target === 'weight_kg' && values[0] === 0) {\n          issues.push('weight_kg withheld: zero is not a valid weight.');\n        } else {\n          if (target === 'steps' && !Number.isSafeInteger(values[0])) throw new Error(`${date}: steps must be an integer.`);\n          fields[target] = target === 'steps' ? values[0] : round(values[0]);\n        }\n      }\n    }\n    const sleepRows = config.sleepSource ? sleep.filter(row => row.source === config.sleepSource) : sleep;\n    if (config.sleepSource && sleep.length && !sleepRows.length) {\n      issues.push('sleep_hours withheld: the configured sleep source has no record.');\n    }\n    const candidates = new Map();\n    let invalidSleep = false;\n    for (const row of sleepRows) {\n      const start = Date.parse(row.bedtime);\n      const end = Date.parse(row.wake_time);\n      const seconds = numeric(row.time_asleep_in_seconds ?? row.duration_in_seconds, 'sleep duration');\n      const hasOffset = value => typeof value === 'string' && /(?:Z|[+-]\\d{2}:\\d{2})$/.test(value);\n      if (!hasOffset(row.bedtime) || !hasOffset(row.wake_time) || !Number.isFinite(start) ||\n          !Number.isFinite(end) || end <= start || seconds <= 0 || seconds * 1000 > end - start) {\n        invalidSleep = true;\n        continue;\n      }\n      let wakeDate;\n      if (!row.record_timezone && row.record_utc_offset_minutes != null) {\n        const offset = Number(row.record_utc_offset_minutes);\n        if (!Number.isFinite(offset) || Math.abs(offset) > 840) throw new Error('Invalid recorded sleep UTC offset.');\n        wakeDate = new Date(end + offset * 60000).toISOString().slice(0, 10);\n      } else {\n        const parts = Object.fromEntries(new Intl.DateTimeFormat('en-CA', {\n          timeZone: row.record_timezone || config.timezone, year: 'numeric', month: '2-digit', day: '2-digit',\n        }).formatToParts(new Date(end)).map(part => [part.type, part.value]));\n        wakeDate = `${parts.year}-${parts.month}-${parts.day}`;\n      }\n      if (dayString(row.entry_date) !== date || wakeDate !== date) {\n        invalidSleep = true;\n        continue;\n      }\n      candidates.set(`${start}/${end}/${seconds}`, { seconds, source: row.source });\n    }\n    if (invalidSleep || candidates.size > 1) {\n      issues.push('sleep_hours withheld: invalid, incorrectly dated, or conflicting sleep records. No durations are added together.');\n    } else if (candidates.size === 1) {\n      fields.sleep_hours = round([...candidates.values()][0].seconds / 3600);\n    }\n    const labels = {\n      calories_kcal: ['Energy', 'kcal'], protein_g: ['Protein', 'g'], carbs_g: ['Carbohydrate', 'g'],\n      fat_g: ['Fat', 'g'], fiber_g: ['Fibre', 'g'], water_ml: ['Water', 'ml'],\n      weight_kg: ['Weight', 'kg'], steps: ['Steps', ''], sleep_hours: ['Sleep', 'hours'],\n    };\n    const lines = [\n      '<!-- sparkyfitness:start -->', '## SparkyFitness', '',\n      `Recorded date: ${date} | [Source](${config.sparkyBaseUrl}/)`, '',\n      'Logged totals only; missing values do not mean zero or a completed day.', '',\n      '| Metric | Recorded value |', '| --- | --- |',\n    ];\n    for (const [key, [label, unit]] of Object.entries(labels)) {\n      if (fields[key] !== undefined) lines.push(`| ${label} | ${fields[key]}${unit ? ` ${unit}` : ''} |`);\n    }\n    if (Object.keys(fields).length === 0) lines.push('| Observations | None available |');\n    const absent = Object.entries(labels).filter(([key]) => fields[key] === undefined).map(([, value]) => value[0]);\n    if (absent.length) lines.push('', `Not available: ${absent.join(', ')}.`);\n    if (entries.length) {\n      lines.push('', '### Food diary', '', '| Meal | Time | Food | Quantity |',\n        '| --- | --- | --- | --- |');\n      for (const entry of entries) {\n        lines.push(`| ${cell(entry.meal_type || 'Unspecified')} | ${cell(entry.entry_time || '')} | ${cell(entry.food_name || '[name not supplied]')} | ${numeric(entry.quantity, 'quantity')} ${cell(entry.unit || '')} |`);\n      }\n    }\n    if (hasSupplements) lines.push('', 'Nutrition totals include recorded supplements.');\n    if (fields.sleep_hours !== undefined) {\n      lines.push('', `Sleep source: ${cell([...candidates.values()][0].source || 'not supplied')}.`);\n    }\n    if (issues.length) lines.push('', '### Data notes', '', ...issues.map(issue => `- ${issue}`));\n    lines.push('<!-- sparkyfitness:end -->');\n    return { json: { config, date, fields, issues, hasData: Object.keys(fields).length > 0,\n      managedBlock: lines.join('\\n') } };\n  });\n})();"
+        },
+        "id": "219057c0-6bb3-46bb-a4fa-146407537c1d",
+        "name": "Normalize recorded data",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          928,
+          80
+        ]
+      },
+      {
+        "parameters": {
+          "jsCode": "\nreturn (function buildVaultReads() {\n  const plans = $input.all().map(item => item.json);\n  const config = plans[0].config;\n  const encodePath = value => value.split('/').map(encodeURIComponent).join('/');\n  const requests = [{ json: { kind: 'template', path: config.dailyTemplatePath,\n    url: `${config.obsidianBaseUrl}/vault/${encodePath(config.dailyTemplatePath)}` } }];\n  for (const plan of plans) {\n    const year = plan.date.slice(0, 4);\n    const month = plan.date.slice(0, 7);\n    for (const candidate of [`${year}/${plan.date}.md`, `${year}/${month}/${plan.date}.md`,\n      `z_archive/${year}/${month}/${plan.date}.md`]) {\n      requests.push({ json: { kind: 'note', date: plan.date, path: candidate, plan,\n        url: `${config.obsidianBaseUrl}/vault/${encodePath(candidate)}` } });\n    }\n  }\n  return requests;\n})();"
+        },
+        "id": "422667cd-45d6-4609-b67b-80fb2ac8d7f5",
+        "name": "Build vault reads",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          1152,
+          80
+        ]
+      },
+      {
+        "parameters": {
+          "url": "={{ $json.url }}",
+          "authentication": "genericCredentialType",
+          "genericAuthType": "httpHeaderAuth",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Accept",
+                "value": "application/vnd.olrapi.note+json"
+              }
+            ]
+          },
+          "options": {
+            "batching": {
+              "batch": {
+                "batchSize": 1
+              }
+            },
+            "redirect": {
+              "redirect": {
+                "followRedirects": false
+              }
+            },
+            "response": {
+              "response": {
+                "fullResponse": true,
+                "neverError": true,
+                "responseFormat": "json"
+              }
+            },
+            "timeout": 30000
+          }
+        },
+        "id": "de87fce1-3ae4-40d6-8b31-96306304228d",
+        "name": "Read Obsidian notes",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.3,
+        "position": [
+          1392,
+          80
+        ],
+        "retryOnFail": true,
+        "maxTries": 3,
+        "waitBetweenTries": 2000,
+        "credentials": {
+          "httpHeaderAuth": {
+            "id": "fPeBwVzu65xvnWgy",
+            "name": "Obsidian Local REST API"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "jsCode": "function isSyncField(key) {\n  return /^(?:hardcover_|sparkyfitness_|kindle-)/i.test(key);\n}\n\nfunction isSyncObject(value) {\n  if (value === null || typeof value !== 'object' || Array.isArray(value)) return false;\n  // n8n secure mode stubs prototype inspection; validate record shape instead.\n  if (Object.prototype.toString.call(value) !== '[object Object]') return false;\n  if (!Object.hasOwn(value, 'constructor') && value.constructor !== undefined &&\n      (typeof value.constructor !== 'function' || value.constructor.name !== 'Object')) return false;\n  for (const key in value) {\n    if (!Object.hasOwn(value, key)) return false;\n  }\n  return true;\n}\n\nfunction syncJson(value) {\n  const normalize = item => {\n    if (item === null || typeof item === 'string' || typeof item === 'boolean') return item;\n    if (typeof item === 'number' && Number.isFinite(item)) return item;\n    if (Array.isArray(item)) return item.map(normalize);\n    if (isSyncObject(item)) {\n      return Object.fromEntries(Object.keys(item).sort().map(key => [key, normalize(item[key])]));\n    }\n    throw new Error('External-sync metadata must contain only JSON values.');\n  };\n  return JSON.stringify(normalize(value)).replace(/</g, '\\\\u003c').replace(/>/g, '\\\\u003e');\n}\n\nfunction validateSyncProperties(properties) {\n  if (!isSyncObject(properties)) {\n    throw new Error('External-sync properties must be a JSON object.');\n  }\n  const seen = new Set();\n  for (const key of Object.keys(properties)) {\n    if (!isSyncField(key) || seen.has(key.toLowerCase())) {\n      throw new Error(`Unknown or case-conflicting external-sync property: ${key}`);\n    }\n    seen.add(key.toLowerCase());\n  }\n  syncJson(properties);\n  return properties;\n}\n\nfunction readSyncMetadata(content) {\n  const marker = '<!-- external-sync';\n  const count = content.split(marker).length - 1;\n  if (!count) return { properties: {}, start: -1, end: -1 };\n  const matches = [...content.matchAll(/^<!-- external-sync\\r?\\n([\\s\\S]*?)\\r?\\n-->(?=\\r?\\n|$)/gm)];\n  if (count !== 1 || matches.length !== 1) {\n    throw new Error('Malformed or repeated external-sync comment; refusing to edit.');\n  }\n  const match = matches[0];\n  const before = content.slice(0, match.index);\n  const opening = /^\\uFEFF?---[ \\t]*\\r?\\n/.exec(content);\n  const closing = opening && /^(?:---|\\.\\.\\.)[ \\t]*(?:\\r?\\n|$)/m.exec(content.slice(opening[0].length));\n  if (opening && (!closing || match.index < opening[0].length + closing.index + closing[0].length)) {\n    throw new Error('External-sync comments must be outside frontmatter.');\n  }\n  let fence = null;\n  for (const line of before.split(/\\r?\\n/)) {\n    const token = /^ {0,3}(`{3,}|~{3,})(.*)$/.exec(line);\n    if (!token) continue;\n    if (!fence) fence = { character: token[1][0], length: token[1].length };\n    else if (token[1][0] === fence.character && token[1].length >= fence.length && !token[2].trim()) fence = null;\n  }\n  if (fence || before.lastIndexOf('<!--') > before.lastIndexOf('-->')) {\n    throw new Error('External-sync comments must not be inside code fences or other comments.');\n  }\n  let payload;\n  try {\n    payload = JSON.parse(match[1]);\n  } catch (error) {\n    throw new Error(`Invalid external-sync JSON: ${error.message}`);\n  }\n  if (!payload || payload.version !== 1 || Object.keys(payload).sort().join(',') !== 'properties,version') {\n    throw new Error('Unsupported external-sync schema; expected version 1 and properties.');\n  }\n  return { properties: validateSyncProperties(payload.properties), start: match.index,\n    end: match.index + match[0].length };\n}\n\nfunction mergeSyncProperties(content, metadata) {\n  const properties = { ...readSyncMetadata(content).properties };\n  for (const [key, value] of Object.entries(metadata)) {\n    if (!isSyncField(key)) continue;\n    const existing = Object.keys(properties).find(name => name.toLowerCase() === key.toLowerCase());\n    if (existing && syncJson(properties[existing]) !== syncJson(value)) {\n      throw new Error(`Legacy frontmatter and external-sync comment disagree for ${key}.`);\n    }\n    if (!existing) properties[key] = value;\n  }\n  return validateSyncProperties(properties);\n}\n\nfunction writeSyncMetadata(content, properties) {\n  validateSyncProperties(properties);\n  const previous = readSyncMetadata(content);\n  if (!Object.keys(properties).length && previous.start < 0) return content;\n  const eol = content.includes('\\r\\n') ? '\\r\\n' : '\\n';\n  const comment = `<!-- external-sync${eol}${syncJson({ version: 1, properties })}${eol}-->`;\n  const updated = previous.start >= 0\n    ? content.slice(0, previous.start) + comment + content.slice(previous.end)\n    : content + (content.endsWith(eol + eol) ? '' : content.endsWith('\\n') ? eol : eol + eol) + comment + eol;\n  readSyncMetadata(updated);\n  return updated;\n}\nreturn (function prepareNoteUpdates() {\n  const requests = $('Build vault reads').all();\n  const responses = $input.all();\n  if (requests.length !== responses.length) throw new Error('Unexpected number of Obsidian read responses.');\n  const records = requests.map((item, index) => ({ ...item.json, response: responses[index].json }));\n  for (const record of records) {\n    if (![200, 404].includes(record.response.statusCode)) {\n      throw new Error(`Obsidian ${record.path}: HTTP ${record.response.statusCode}. Check the address, API key, and TLS trust.`);\n    }\n    if (record.response.statusCode === 200 &&\n        (!record.response.body || typeof record.response.body.content !== 'string' ||\n         !record.response.body.frontmatter || typeof record.response.body.frontmatter !== 'object')) {\n      throw new Error(`Obsidian ${record.path}: expected application/vnd.olrapi.note+json.`);\n    }\n  }\n  const template = records.find(record => record.kind === 'template');\n  const allowed = new Set(['calories_kcal', 'protein_g', 'carbs_g', 'fat_g', 'fiber_g',\n    'water_ml', 'weight_kg', 'steps', 'sleep_hours']);\n  const updateFrontmatter = (content, values, removals, metadata) => {\n    const bom = content.startsWith('\\uFEFF') ? '\\uFEFF' : '';\n    const text = content.slice(bom.length);\n    const eol = content.includes('\\r\\n') ? '\\r\\n' : '\\n';\n    const opening = /^---[ \\t]*\\r?\\n/.exec(text);\n    let body = '';\n    let tail = text;\n    let head = `---${eol}`;\n    let closing = `---${eol}`;\n    if (opening) {\n      const rest = text.slice(opening[0].length);\n      const end = /^(?:---|\\.\\.\\.)[ \\t]*(?:\\r?\\n|$)/m.exec(rest);\n      if (!end) throw new Error('Unclosed YAML frontmatter; refusing to edit the note.');\n      body = rest.slice(0, end.index);\n      head = opening[0];\n      closing = end[0];\n      tail = rest.slice(end.index + end[0].length);\n    }\n    const lines = body.match(/[^\\n]*(?:\\n|$)/g)?.filter(line => line !== '') || [];\n    const commentOrBlank = line => /^\\s*(?:#.*)?$/.test(line.replace(/\\r?\\n$/, ''));\n    const touched = new Set([...Object.keys(values), ...removals]);\n    const found = new Set();\n    for (let i = lines.length - 1; i >= 0; i--) {\n      const key = /^([A-Za-z_][A-Za-z0-9_-]*):(?:[ \\t]|$)/.exec(lines[i].replace(/\\r?\\n$/, ''));\n      if (!key || !touched.has(key[1])) continue;\n      if (found.has(key[1])) throw new Error(`Duplicate YAML property ${key[1]}; refusing to edit.`);\n      found.add(key[1]);\n      const old = metadata[key[1]];\n      if (old != null && typeof old !== 'number' && !['sparkyfitness_fields', 'sparkyfitness_date'].includes(key[1])) {\n        throw new Error(`Unexpected type for ${key[1]}; refusing to replace user-authored structured content.`);\n      }\n      let end = i + 1;\n      while (end < lines.length && /^(?:[ \\t]+\\S|-[ \\t])/.test(lines[end])) end++;\n      const replacement = Object.hasOwn(values, key[1])\n        ? [`${key[1]}: ${JSON.stringify(values[key[1]])}${eol}`] : [];\n      const rawValue = lines[i].replace(/\\r?\\n$/, '').slice(key[1].length + 1)\n        .replace(/(?:^|\\s+)#.*$/, '').trim();\n      if (key[1] === 'sparkyfitness_fields') {\n        const ownerKey = raw => {\n          const match = /^(?:\"([A-Za-z_]+)\"|'([A-Za-z_]+)'|([A-Za-z_]+))$/.exec(raw.trim());\n          if (!match) throw new Error('Unsupported ownership list item.');\n          return match[1] || match[2] || match[3];\n        };\n        let rawFields;\n        if (rawValue === '') {\n          let cursor = i + 1;\n          let lastValueLine = i;\n          while (cursor < lines.length) {\n            if (commentOrBlank(lines[cursor])) {\n              cursor++;\n              continue;\n            }\n            if (/^\\s*-[ \\t]/.test(lines[cursor])) {\n              lastValueLine = cursor++;\n              continue;\n            }\n            break;\n          }\n          end = lastValueLine + 1;\n          rawFields = end === i + 1 ? null : lines.slice(i + 1, end).filter(line => !commentOrBlank(line))\n            .map(line => ownerKey(line.replace(/^\\s*-[ \\t]+/, '').replace(/\\s+#.*$/, '').trim()));\n          replacement.push(...lines.slice(i + 1, end).filter(commentOrBlank));\n        } else if (!/^\\[.*\\]$/.test(rawValue)) {\n          throw new Error('Unsupported multiline ownership list; use a standard YAML list.');\n        } else {\n          const items = rawValue.slice(1, -1).trim();\n          rawFields = items ? items.replace(/,[ \\t]*$/, '').split(',').map(ownerKey) : [];\n        }\n        if (syncJson(rawFields) !== syncJson(metadata[key[1]])) {\n          throw new Error('Ownership YAML disagrees with the Obsidian metadata cache; wait for indexing and rerun.');\n        }\n      } else {\n        const scalar = key[1] === 'sparkyfitness_date'\n          ? /^(?:\"\\d{4}-\\d{2}-\\d{2}\"|'\\d{4}-\\d{2}-\\d{2}'|\\d{4}-\\d{2}-\\d{2})$/\n          : /^(?:null|~|[-+]?(?:\\d+(?:\\.\\d*)?|\\.\\d+)(?:[eE][-+]?\\d+)?)?$/;\n        if (!scalar.test(rawValue) ||\n            lines.slice(i + 1, end).some(line => !commentOrBlank(line))) {\n          throw new Error(`Nonstandard YAML value for ${key[1]}; refusing to rewrite structured content.`);\n        }\n        if (key[1] === 'sparkyfitness_date' &&\n            rawValue.replace(/^[\"']|[\"']$/g, '') !== metadata[key[1]]) {\n          throw new Error('Ownership date YAML disagrees with the Obsidian metadata cache; wait for indexing and rerun.');\n        }\n        end = i + 1;\n      }\n      if (['sparkyfitness_fields', 'sparkyfitness_date'].includes(key[1]) && !Object.hasOwn(values, key[1])) {\n        const comment = /[ \\t]+(#.*?)(?:\\r?\\n)?$/.exec(lines[i]);\n        if (comment) replacement.unshift(comment[1] + eol);\n      }\n      lines.splice(i, end - i, ...replacement);\n    }\n    for (const key of touched) {\n      if (Object.hasOwn(metadata, key) && !found.has(key)) {\n        throw new Error(`Nonstandard or quoted YAML property ${key}; edit it manually before syncing.`);\n      }\n    }\n    for (const [key, value] of Object.entries(values)) {\n      if (!found.has(key)) lines.push(`${key}: ${JSON.stringify(value)}${eol}`);\n    }\n    return bom + head + lines.join('') + closing + tail;\n  };\n  const updateBlock = (content, block) => {\n    const startMarker = '<!-- sparkyfitness:start -->';\n    const endMarker = '<!-- sparkyfitness:end -->';\n    const starts = content.split(startMarker).length - 1;\n    const ends = content.split(endMarker).length - 1;\n    const eol = content.includes('\\r\\n') ? '\\r\\n' : '\\n';\n    const replacement = block.replace(/\\n/g, eol);\n    if (starts === 0 && ends === 0) {\n      return content + (content.endsWith('\\n') ? eol : eol + eol) + replacement + eol;\n    }\n    const start = content.indexOf(startMarker);\n    const end = content.indexOf(endMarker);\n    if (starts !== 1 || ends !== 1 || end < start ||\n        (start > 0 && content[start - 1] !== '\\n') ||\n        (end > 0 && content[end - 1] !== '\\n')) {\n      throw new Error('Malformed or repeated SparkyFitness markers; refusing to overwrite the note.');\n    }\n    return content.slice(0, start) + replacement + content.slice(end + endMarker.length);\n  };\n  const output = [];\n  const dates = [...new Set(records.filter(record => record.kind === 'note').map(record => record.date))];\n  for (const date of dates) {\n    const candidates = records.filter(record => record.kind === 'note' && record.date === date);\n    const existing = candidates.filter(record => record.response.statusCode === 200);\n    if (existing.length > 1) throw new Error(`${date}: multiple notes exist (${existing.map(record => record.path).join(', ')}). Resolve the duplicate first.`);\n    const plan = candidates[0].plan;\n    const note = existing[0] || candidates[0];\n    const metadata = existing.length ? note.response.body.frontmatter : {};\n    const syncProperties = mergeSyncProperties(existing.length ? note.response.body.content : '', metadata);\n    const previous = Object.hasOwn(syncProperties, 'sparkyfitness_fields') ? syncProperties.sparkyfitness_fields : [];\n    if (!Array.isArray(previous) || previous.some(key => !allowed.has(key)) ||\n        new Set(previous).size !== previous.length) {\n      throw new Error(`${date}: invalid sparkyfitness_fields ownership metadata.`);\n    }\n    if ((previous.length || Object.hasOwn(syncProperties, 'sparkyfitness_date')) &&\n        syncProperties.sparkyfitness_date !== date) {\n      throw new Error(`${date}: ownership date does not match the note filename.`);\n    }\n    const base = { config: plan.config, date, path: note.path, url: note.url,\n      fields: plan.fields, issues: plan.issues, managedBlock: plan.managedBlock };\n    const legacy = ['sparkyfitness_fields', 'sparkyfitness_date'].filter(key => Object.hasOwn(metadata, key));\n    if ((!plan.hasData && previous.length === 0 && !legacy.length) || (!existing.length && !plan.config.createMissingNotes)) {\n      output.push({ json: { ...base, action: !plan.hasData ? 'no-data' : 'missing-note', changes: {} } });\n      continue;\n    }\n    let original;\n    if (existing.length) {\n      original = note.response.body.content;\n    } else {\n      if (template.response.statusCode !== 200) throw new Error('Cannot create a note: the daily template is missing.');\n      if (Object.keys(template.response.body.frontmatter).some(isSyncField) ||\n          Object.keys(mergeSyncProperties(template.response.body.content, {})).length) {\n        throw new Error('The daily template must not contain external sync bookkeeping.');\n      }\n      original = template.response.body.content.replace(/\\{\\{date:YYYY-MM-DD\\}\\}/g, date);\n      if (/\\{\\{[\\s\\S]*?\\}\\}|<%/.test(original)) throw new Error('Daily template has unsupported dynamic placeholders.');\n    }\n    const removals = previous.filter(key => !Object.hasOwn(plan.fields, key));\n    const cleaned = updateFrontmatter(original, plan.fields, [...removals, ...legacy], metadata);\n    const updated = writeSyncMetadata(updateBlock(cleaned, plan.managedBlock),\n      { ...syncProperties, sparkyfitness_fields: Object.keys(plan.fields).sort(), sparkyfitness_date: date });\n    const headers = { 'Content-Type': 'text/markdown' };\n    if (existing.length) {\n      const tag = note.response.body.version || note.response.headers?.etag || note.response.headers?.ETag;\n      if (typeof tag !== 'string' || !tag) throw new Error('Obsidian must provide an ETag/version for safe conditional writes.');\n      headers['If-Match'] = tag;\n    } else {\n      headers['If-None-Match'] = '*';\n    }\n    const changes = {};\n    for (const key of [...Object.keys(plan.fields), ...removals]) {\n      const before = metadata[key] ?? null;\n      const after = plan.fields[key] ?? null;\n      if (before !== after) changes[key] = { before, after };\n    }\n    output.push({ json: { ...base, action: existing.length ? (updated === original ? 'unchanged' : 'update') : 'create',\n      changes, headers, proposedContent: updated } });\n  }\n  return output;\n})();"
+        },
+        "id": "4daa9daa-e76a-460a-a001-a75cc9a87eef",
+        "name": "Prepare note updates",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          1616,
+          80
+        ]
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "options": {
+              "caseSensitive": true,
+              "leftValue": "",
+              "typeValidation": "strict",
+              "version": 2
+            },
+            "conditions": [
+              {
+                "id": "01b07ca1-9250-4c38-ade9-8b6a68a89e73",
+                "leftValue": "={{ $json.config.previewOnly === false && ['update', 'create'].includes($json.action) }}",
+                "rightValue": "",
+                "operator": {
+                  "type": "boolean",
+                  "operation": "true",
+                  "singleValue": true
+                }
+              }
+            ],
+            "combinator": "and"
+          },
+          "options": {}
+        },
+        "id": "8471a1e0-658c-47ff-b1d7-11344121103d",
+        "name": "Write enabled?",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2.2,
+        "position": [
+          1840,
+          80
+        ]
+      },
+      {
+        "parameters": {
+          "jsCode": "\nreturn (function previewResults() {\n  return $input.all().map(item => {\n    const { date, path, action, fields, changes, issues, managedBlock, config } = item.json;\n    return { json: { date, path, action, previewOnly: config.previewOnly, fields, changes, issues,\n      managedBlock, note: ['update', 'create'].includes(action)\n        ? 'Preview only: no note has been written.' : 'No write required.' } };\n  });\n})();"
+        },
+        "id": "a051ccda-d2de-4568-9243-f72196c8c1fe",
+        "name": "Preview or unchanged",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          2080,
+          272
+        ]
+      },
+      {
+        "parameters": {
+          "method": "PUT",
+          "url": "={{ $json.config?.previewOnly === false && ['create', 'update'].includes($json.action) ? $json.url : (() => { throw new Error('Write refused: previewOnly must be false and action must be create/update. Run the full workflow after reviewing the preview.'); })() }}",
+          "authentication": "genericCredentialType",
+          "genericAuthType": "httpHeaderAuth",
+          "sendHeaders": true,
+          "specifyHeaders": "json",
+          "jsonHeaders": "={{ JSON.stringify($json.headers) }}",
+          "sendBody": true,
+          "contentType": "raw",
+          "rawContentType": "text/markdown",
+          "body": "={{ $json.proposedContent }}",
+          "options": {
+            "batching": {
+              "batch": {
+                "batchSize": 1
+              }
+            },
+            "redirect": {
+              "redirect": {
+                "followRedirects": false
+              }
+            },
+            "response": {
+              "response": {
+                "fullResponse": true
+              }
+            },
+            "timeout": 30000
+          }
+        },
+        "id": "d104fa73-818e-4df8-822b-4bf5c9f8f0e0",
+        "name": "Write guarded note",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.3,
+        "position": [
+          2080,
+          0
+        ],
+        "credentials": {
+          "httpHeaderAuth": {
+            "id": "fPeBwVzu65xvnWgy",
+            "name": "Obsidian Local REST API"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "url": "={{ $('Write enabled?').item.json.url }}",
+          "authentication": "genericCredentialType",
+          "genericAuthType": "httpHeaderAuth",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Accept",
+                "value": "text/markdown"
+              }
+            ]
+          },
+          "options": {
+            "batching": {
+              "batch": {
+                "batchSize": 1
+              }
+            },
+            "redirect": {
+              "redirect": {
+                "followRedirects": false
+              }
+            },
+            "response": {
+              "response": {
+                "fullResponse": true,
+                "responseFormat": "text",
+                "outputPropertyName": "body"
+              }
+            },
+            "timeout": 30000
+          }
+        },
+        "id": "b28b8cd7-b574-409a-bc15-21a1df6ace73",
+        "name": "Read back written note",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.3,
+        "position": [
+          2304,
+          0
+        ],
+        "retryOnFail": true,
+        "maxTries": 3,
+        "waitBetweenTries": 2000,
+        "credentials": {
+          "httpHeaderAuth": {
+            "id": "fPeBwVzu65xvnWgy",
+            "name": "Obsidian Local REST API"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "jsCode": "\nreturn (function verifyWrites() {\n  const expected = $('Write enabled?').all(0);\n  const actual = $input.all();\n  if (expected.length !== actual.length) throw new Error('Unexpected number of verification responses.');\n  return actual.map((item, index) => {\n    const plan = expected[index].json;\n    if (item.json.statusCode !== 200 || item.json.body !== plan.proposedContent) {\n      throw new Error(`${plan.path}: read-back differs from the submitted note. Inspect for concurrent/Seafile edits; nothing will be overwritten again in this run.`);\n    }\n    return { json: { date: plan.date, path: plan.path, action: plan.action,\n      verified: true, fields: plan.fields, issues: plan.issues } };\n  });\n})();"
+        },
+        "id": "f3c64f55-a980-431d-a814-c67e4c0835fd",
+        "name": "Verify persisted content",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          2544,
+          0
+        ]
+      },
+      {
+        "parameters": {
+          "content": "# SparkyFitness -> Obsidian\n\nBuilt for n8n 2.44.6 and SparkyFitness v1.9.0. Imported INACTIVE and PREVIEW ONLY.\n\n## Credentials (never paste secrets into Settings)\nCreate an HTTP Header Auth credential named \"SparkyFitness read-only\":\n- Header name: X-API-Key\n- Value: a read-scope API key created in your SparkyFitness settings.\n- Assign it to Read SparkyFitness.\nCreate an HTTP Header Auth credential named \"Obsidian Local REST API\":\n- Header name: Authorization\n- Value: Bearer followed by a space and your VM Obsidian REST API key.\n- Assign it to Read Obsidian notes, Write guarded note, and Read back written note.\n\n## First run\n1. Open Settings. Confirm the VM REST URL, Europe/Madrid timezone, and template path.\n2. Confirm n8n can resolve/reach the HTTPS hostname below; do not disable certificate checks.\n3. Run the whole workflow from Manual preview, not Execute step on a write node. Inspect Preview or unchanged.\nThe PUT node also checks previewOnly=false and a create/update action before resolving its URL.\n4. After approving the preview, set previewOnly=false and execute manually once.\n5. Inspect Verify persisted content and the resulting notes before publishing/activating.\n\n## Networking\nn8n runs in a separate Proxmox LXC at 192.168.178.75.\nObsidian runs in the VM at 192.168.178.44.\nNginx Proxy Manager provides https://obsidian.ggarcia24.work with a trusted certificate.\nThis URL returned Obsidian REST API 5.5.2 with normal TLS verification during setup.\nUse that hostname, NOT localhost or the bare VM IP. No custom CA credential is needed in n8n.\nPrefer internal DNS routing from the LXC to NPM; no Cloudflare tunnel is needed for LAN traffic.\nEach HTTP node spaces request starts by 1000 ms to avoid lookup/request bursts.\nGET nodes allow up to 3 node attempts, waiting 2000 ms between attempts; a retry repeats the read batch.\nConditional PUT nodes are never automatically retried. Persistent DNS failures still require resolver repair.\nKeep the proxy host LAN/VPN-restricted and preserve Authorization, If-Match and If-None-Match headers.\nAllow GET and PUT through the proxy; do not cache API note responses.\nNPM-to-VM upstream settings have not been inspected: trusted frontend TLS does not validate that hop.\nFor verified HTTPS upstream, trust the Obsidian CA in NPM and use a matching certificate hostname.\nIf choosing HTTP upstream instead, it is unencrypted: restrict that VM port to NPM on a trusted network.\n\n## Behavior\nEvery hour at :15, re-read today plus the previous two calendar days.\nSource is SparkyFitness only. No MyFitnessPal/Strong/Huawei calls or write-back.\nNutrition matches reference-serving scaling and includes supplement totals.\nCalorie reconciliation rounds the unrounded food-plus-supplement sum to whole kcal, matching SparkyFitness.\nGenuine calorie disagreements stop the run and show calculated, rounded and reported totals.\nNo food/supplement log means unknown nutrition, not fabricated zeros.\nA zero hydration aggregate cannot prove an observation, so water_ml is omitted.\nWeight/steps are exact-day check-ins, never carry-forward values.\nConflicting check-ins or sleep records are withheld and explained, not summed.\nSleep uses explicit time asleep when available, otherwise SparkyFitness recorded duration.\nSleep must fit its window and match its recorded-local wake date.\nOptionally set sleepSource to an exact source string visible in SparkyFitness.\nNo workouts, active_minutes, habits, or planning properties are changed.\n\n## Notes and ownership\nCreate new notes at YYYY/YYYY-MM-DD.md; reuse YYYY/YYYY-MM/YYYY-MM-DD.md or z_archive/YYYY/YYYY-MM/YYYY-MM-DD.md if already present.\nMonthly reviews can move completed months into YYYY/YYYY-MM/; current-month notes stay in the year root.\nIf multiple candidate notes exist, stop instead of choosing a duplicate.\nMissing notes with data use the current _templates/daily_note.md, substituting its date.\nOnly YYYY-MM-DD date placeholders are supported; unknown dynamic syntax stops creation.\nUpdate only recorded metric properties in frontmatter. Technical sync bookkeeping belongs in a hidden external-sync comment.\nThe comment contains JSON: {\"version\":1,\"properties\":{\"sparkyfitness_fields\":[\"steps\"],\"sparkyfitness_date\":\"2026-10-24\"}}.\nPlace that JSON between standalone <!-- external-sync and --> lines outside frontmatter and generated sections.\nLegacy ownership properties are relocated automatically on the next recorded/owned-day update.\nConflicting legacy/comment values, malformed comments or mismatched dates stop writes rather than discarding ownership.\nOnly fields previously owned by this workflow can be removed when observations disappear.\nOther frontmatter, handwritten text, and the existing fitness-db block are preserved.\nThe separate sparkyfitness:start/end block is machine-owned; keep handwriting outside it.\nWrites are exact-text splices submitted with conditional PUT (If-Match/If-None-Match),\nnot unconditional replacements. A 412 means re-read/re-run, never bypass the guard.\nExisting-note guards prefer the note JSON file version, not its metadata representation ETag.\nRaw PUT responses use Autodetect so n8n consumes response streams, including empty HTTP 204 bodies.\nText read-back responses are placed in body for exact comparison by Verify persisted content.\nA response-handling error can occur after successful writes. Re-read the full window before retrying.\nEvery written note is read back and compared byte-for-byte.\nStable data makes no changes. No import timestamp is rewritten on every run.\n\n## Operational limits\nSeafile can still create conflicts with remote simultaneous edits. Inspect SFConflict files.\nNo overlap lock is assumed: conditional writes stop stale local snapshots.\nAfter downtime longer than the window, increase lookbackDays (max 31) or use endDateOverride.\nA run can stop after some dates were written; those are verified by the next idempotent run.\nUnexpected API responses, permissions, TLS, ambiguous YAML, or invalid data fail explicitly.\nDo not pin real health data or share execution exports. Automatic and manual payload retention is disabled.\nLive API authentication, a real-data preview, and import into your n8n instance have not been performed.",
+          "height": 1800,
+          "width": 1050,
+          "color": 5
+        },
+        "id": "0587f034-6eec-4631-a0a8-2256de726ac5",
+        "name": "Setup and safety",
+        "type": "n8n-nodes-base.stickyNote",
+        "typeVersion": 1,
+        "position": [
+          0,
+          432
+        ]
+      }
+    ],
+    "connections": {
+      "Manual preview": {
+        "main": [
+          [
+            {
+              "node": "Settings",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Hourly reconciliation": {
+        "main": [
+          [
+            {
+              "node": "Settings",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Settings": {
+        "main": [
+          [
+            {
+              "node": "Build source requests",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Build source requests": {
+        "main": [
+          [
+            {
+              "node": "Read SparkyFitness",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Read SparkyFitness": {
+        "main": [
+          [
+            {
+              "node": "Normalize recorded data",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Normalize recorded data": {
+        "main": [
+          [
+            {
+              "node": "Build vault reads",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Build vault reads": {
+        "main": [
+          [
+            {
+              "node": "Read Obsidian notes",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Read Obsidian notes": {
+        "main": [
+          [
+            {
+              "node": "Prepare note updates",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Prepare note updates": {
+        "main": [
+          [
+            {
+              "node": "Write enabled?",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Write enabled?": {
+        "main": [
+          [
+            {
+              "node": "Write guarded note",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Preview or unchanged",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Write guarded note": {
+        "main": [
+          [
+            {
+              "node": "Read back written note",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Read back written note": {
+        "main": [
+          [
+            {
+              "node": "Verify persisted content",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "nodeGroups": [],
+    "authors": "Gonzalo Garcia",
+    "name": "Version 521e84e6",
+    "description": "",
+    "autosaved": true,
+    "createdAt": "2026-10-27T11:48:42.913Z",
+    "updatedAt": "2026-10-27T12:28:10.000Z"
+  },
+  "activeVersionId": "521e84e6-7a72-43d2-abee-22a400b62047",
+  "connections": {
+    "Manual preview": {
+      "main": [
+        [
+          {
+            "node": "Settings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Hourly reconciliation": {
+      "main": [
+        [
+          {
+            "node": "Settings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Settings": {
+      "main": [
+        [
+          {
+            "node": "Build source requests",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build source requests": {
+      "main": [
+        [
+          {
+            "node": "Read SparkyFitness",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read SparkyFitness": {
+      "main": [
+        [
+          {
+            "node": "Normalize recorded data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize recorded data": {
+      "main": [
+        [
+          {
+            "node": "Build vault reads",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build vault reads": {
+      "main": [
+        [
+          {
+            "node": "Read Obsidian notes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Obsidian notes": {
+      "main": [
+        [
+          {
+            "node": "Prepare note updates",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare note updates": {
+      "main": [
+        [
+          {
+            "node": "Write enabled?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write enabled?": {
+      "main": [
+        [
+          {
+            "node": "Write guarded note",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Preview or unchanged",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write guarded note": {
+      "main": [
+        [
+          {
+            "node": "Read back written note",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read back written note": {
+      "main": [
+        [
+          {
+            "node": "Verify persisted content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "createdAt": "2026-10-27T11:46:57.526Z",
+  "id": "X8ziv1mJ0BoORpSf",
+  "isArchived": false,
+  "meta": null,
+  "name": "SparkyFitness to Obsidian",
+  "nodeGroups": [],
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "8fa64454-c0cb-4026-b0e5-85c92d83b7d7",
+      "name": "Manual preview",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 22,
+              "triggerAtMinute": 30
+            }
+          ]
+        }
+      },
+      "id": "d142090a-672f-4d56-a030-eed908650908",
+      "name": "Hourly reconciliation",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        0,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "b58bb388-40f6-4ef9-b0ac-cd215dc52b5c",
+              "name": "sparkyBaseUrl",
+              "value": "https://fitness.ggarcia24.site",
+              "type": "string"
+            },
+            {
+              "id": "67abf7a6-2787-4573-b8a5-9c1d3873da56",
+              "name": "obsidianBaseUrl",
+              "value": "https://obsidian.ggarcia24.work",
+              "type": "string"
+            },
+            {
+              "id": "2019c70b-82f5-4724-a66f-be1af75fbc03",
+              "name": "timezone",
+              "value": "Europe/Madrid",
+              "type": "string"
+            },
+            {
+              "id": "e5ca06ad-3247-455a-87db-fb9f15948bb5",
+              "name": "lookbackDays",
+              "value": 7,
+              "type": "number"
+            },
+            {
+              "id": "05f008e6-a842-42e4-bf04-7ab3ccab91e3",
+              "name": "endDateOverride",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "bb28e27b-faee-4223-aa40-69c10b8a57eb",
+              "name": "previewOnly",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "14a8b92f-96e5-4494-bd31-08b6591e0da2",
+              "name": "createMissingNotes",
+              "value": true,
+              "type": "boolean"
+            },
+            {
+              "id": "7de21692-cbf8-4e1d-86fc-d9515720ba86",
+              "name": "dailyTemplatePath",
+              "value": "_templates/daily_note.md",
+              "type": "string"
+            },
+            {
+              "id": "65960eb8-a578-4bce-bfa6-5a190154e3e6",
+              "name": "sleepSource",
+              "value": "",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "def4e4a1-90d0-4299-8ebf-2ac699828498",
+      "name": "Settings",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        240,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "\nreturn (function buildSourceRequests() {\n  const config = { ...$input.first().json };\n  for (const key of ['sparkyBaseUrl', 'obsidianBaseUrl']) {\n    if (typeof config[key] !== 'string' ||\n        !/^https:\\/\\/(?:[A-Za-z0-9.-]+|\\[[A-Fa-f0-9:]+\\])(?::[0-9]{1,5})?\\/?$/.test(config[key])) {\n      throw new Error(`${key} must be an HTTPS origin without credentials, path, query, or fragment.`);\n    }\n    config[key] = config[key].replace(/\\/+$/, '');\n  }\n  if (!Number.isInteger(config.lookbackDays) || config.lookbackDays < 1 || config.lookbackDays > 31) {\n    throw new Error('lookbackDays must be an integer from 1 to 31.');\n  }\n  if (typeof config.previewOnly !== 'boolean' || typeof config.createMissingNotes !== 'boolean') {\n    throw new Error('previewOnly and createMissingNotes must be booleans.');\n  }\n  const parts = Object.fromEntries(new Intl.DateTimeFormat('en-CA', {\n    timeZone: config.timezone, year: 'numeric', month: '2-digit', day: '2-digit',\n  }).formatToParts(new Date()).map(part => [part.type, part.value]));\n  const end = config.endDateOverride || `${parts.year}-${parts.month}-${parts.day}`;\n  const endMs = Date.parse(`${end}T00:00:00Z`);\n  if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(end) || !Number.isFinite(endMs) ||\n      new Date(endMs).toISOString().slice(0, 10) !== end) {\n    throw new Error('endDateOverride must be blank or a real YYYY-MM-DD date.');\n  }\n  const today = `${parts.year}-${parts.month}-${parts.day}`;\n  if (end > today) throw new Error('Future dates cannot be imported.');\n  if (!/^_templates\\/[^\\\\\\r\\n]+\\.md$/.test(config.dailyTemplatePath) ||\n      config.dailyTemplatePath.split('/').includes('..')) {\n    throw new Error('dailyTemplatePath must identify a Markdown file under _templates/.');\n  }\n  const requests = [];\n  for (let offset = config.lookbackDays - 1; offset >= 0; offset--) {\n    const date = new Date(endMs - offset * 86400000).toISOString().slice(0, 10);\n    const endpoints = {\n      summary: `/daily-summary?date=${date}`,\n      water: `/measurements/water-intake/${date}`,\n      measurements: `/measurements/check-in-measurements-range/${date}/${date}`,\n      sleep: `/sleep?startDate=${date}&endDate=${date}`,\n    };\n    for (const [kind, endpoint] of Object.entries(endpoints)) {\n      requests.push({ json: { config, date, kind, url: `${config.sparkyBaseUrl}/api${endpoint}` } });\n    }\n  }\n  return requests;\n})();"
+      },
+      "id": "1053444b-11b7-44da-a4f9-273a679de8b4",
+      "name": "Build source requests",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        464,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.url }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 1
+            }
+          },
+          "redirect": {
+            "redirect": {
+              "followRedirects": false
+            }
+          },
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "responseFormat": "json"
+            }
+          },
+          "timeout": 30000
+        }
+      },
+      "id": "954e3c92-d821-4a3c-a24a-9a80dc606e58",
+      "name": "Read SparkyFitness",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        704,
+        80
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "kicijhQjKvp31Xfo",
+          "name": "SparkyFitness read-only"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "\nreturn (function normalizeSourceData() {\n  const requests = $('Build source requests').all();\n  const responses = $input.all();\n  if (responses.length !== requests.length) throw new Error('Unexpected number of SparkyFitness responses.');\n  const days = new Map();\n  const numeric = (value, label, minimum = 0) => {\n    if ((typeof value !== 'number' && typeof value !== 'string') ||\n        String(value).trim() === '' || !Number.isFinite(Number(value)) || Number(value) < minimum) {\n      throw new Error(`${label}: expected a finite number >= ${minimum}.`);\n    }\n    return Number(value);\n  };\n  const dayString = value => {\n    if (typeof value !== 'string' || !/^\\d{4}-\\d{2}-\\d{2}(?:$|T)/.test(value)) {\n      throw new Error('SparkyFitness returned an invalid entry_date.');\n    }\n    return value.slice(0, 10);\n  };\n  const round = (value, digits = 2) => Number(value.toFixed(digits));\n  const cell = value => String(value).replace(/&/g, '&amp;').replace(/</g, '&lt;')\n    .replace(/>/g, '&gt;').replace(/\\\\/g, '\\\\\\\\').replace(/[|[\\]`*_]/g, '\\\\$&')\n    .replace(/[\\r\\n]+/g, ' ');\n  for (let i = 0; i < requests.length; i++) {\n    const req = requests[i].json;\n    const res = responses[i].json;\n    if (res.statusCode !== 200 || !res.body || typeof res.body !== 'object') {\n      throw new Error(`${req.kind} ${req.date}: expected a JSON 200 response, got ${res.statusCode}.`);\n    }\n    if (!days.has(req.date)) days.set(req.date, { config: req.config, date: req.date });\n    days.get(req.date)[req.kind] = res.body;\n  }\n  return [...days.values()].map(day => {\n    const { date, config, summary, water, measurements, sleep } = day;\n    if (!Array.isArray(summary.foodEntries) || !summary.supplementTotals ||\n        !summary.calorieBalance || !Array.isArray(measurements) || !Array.isArray(sleep)) {\n      throw new Error(`${date}: response does not match SparkyFitness v1.9.0.`);\n    }\n    const fields = {};\n    const issues = [];\n    const entries = [];\n    const seen = new Map();\n    for (const entry of summary.foodEntries) {\n      if (!entry || typeof entry.id !== 'string' || dayString(entry.entry_date) !== date) {\n        throw new Error(`${date}: invalid or incorrectly dated food entry.`);\n      }\n      if (seen.has(entry.id)) {\n        if (seen.get(entry.id) !== JSON.stringify(entry)) throw new Error(`${date}: conflicting duplicate food ID.`);\n        continue;\n      }\n      seen.set(entry.id, JSON.stringify(entry));\n      entries.push(entry);\n    }\n    const nutrients = {\n      calories_kcal: 'calories', protein_g: 'protein', carbs_g: 'carbs',\n      fat_g: 'fat', fiber_g: 'dietary_fiber',\n    };\n    const supplements = summary.supplementTotals;\n    const hasSupplements = Object.values(supplements).some(value => typeof value === 'number' && value > 0) ||\n      Object.values(supplements.custom_nutrients || {}).some(value => Number(value) > 0);\n    const nutritionRecorded = entries.length > 0 || hasSupplements;\n    let calculatedCalories;\n    for (const [target, nutrient] of Object.entries(nutrients)) {\n      const supplementTotal = numeric(supplements[nutrient], `${date} supplement ${nutrient}`);\n      let total = 0;\n      let complete = true;\n      for (const entry of entries) {\n        const source = entry.calories !== undefined || Object.keys(entry.custom_nutrients || {}).length > 0\n          ? entry : entry.food_variants || (entry.foods && entry.foods.default_variant);\n        if (!source || source[nutrient] == null) {\n          complete = false;\n          continue;\n        }\n        // SparkyFitness snapshots nutrients per reference serving, not per logged quantity.\n        const reference = source.serving_size == null ? 100 : numeric(source.serving_size, 'serving_size');\n        if (reference === 0) throw new Error(`${date}: serving_size cannot be zero.`);\n        total += numeric(source[nutrient], nutrient) * numeric(entry.quantity, 'quantity') / reference;\n      }\n      total += supplementTotal;\n      if (nutritionRecorded && complete) {\n        fields[target] = round(total);\n        if (target === 'calories_kcal') calculatedCalories = total;\n      }\n      if (nutritionRecorded && !complete) issues.push(`${target} withheld: one or more food snapshots lack this nutrient.`);\n    }\n    if (calculatedCalories !== undefined) {\n      const reportedCalories = numeric(summary.calorieBalance.eaten, 'calorieBalance.eaten');\n      const roundedCalories = Math.round(calculatedCalories);\n      if (roundedCalories !== reportedCalories) {\n        throw new Error(`${date}: calculated calories disagree with SparkyFitness's daily total (calculated ${calculatedCalories} kcal; rounded ${roundedCalories} kcal; reported ${reportedCalories} kcal). No notes will be written.`);\n      }\n    }\n    const waterMl = numeric(water.water_ml, `${date} water_ml`);\n    if (waterMl > 0) fields.water_ml = round(waterMl);\n    // This endpoint returns zero even without a log; zero alone is not an observation.\n    if (waterMl === 0) issues.push('Water is unrecorded or zero; no water_ml value is inferred.');\n    for (const row of measurements) {\n      if (dayString(row.entry_date) !== date) throw new Error(`${date}: measurement belongs to another day.`);\n    }\n    for (const [target, source] of [['weight_kg', 'weight'], ['steps', 'steps']]) {\n      const values = [...new Set(measurements.filter(row => row[source] != null)\n        .map(row => numeric(row[source], `${date} ${source}`)))];\n      if (values.length > 1) {\n        issues.push(`${target} withheld: conflicting same-day check-ins.`);\n      } else if (values.length === 1) {\n        if (target === 'weight_kg' && values[0] === 0) {\n          issues.push('weight_kg withheld: zero is not a valid weight.');\n        } else {\n          if (target === 'steps' && !Number.isSafeInteger(values[0])) throw new Error(`${date}: steps must be an integer.`);\n          fields[target] = target === 'steps' ? values[0] : round(values[0]);\n        }\n      }\n    }\n    const sleepRows = config.sleepSource ? sleep.filter(row => row.source === config.sleepSource) : sleep;\n    if (config.sleepSource && sleep.length && !sleepRows.length) {\n      issues.push('sleep_hours withheld: the configured sleep source has no record.');\n    }\n    const candidates = new Map();\n    let invalidSleep = false;\n    for (const row of sleepRows) {\n      const start = Date.parse(row.bedtime);\n      const end = Date.parse(row.wake_time);\n      const seconds = numeric(row.time_asleep_in_seconds ?? row.duration_in_seconds, 'sleep duration');\n      const hasOffset = value => typeof value === 'string' && /(?:Z|[+-]\\d{2}:\\d{2})$/.test(value);\n      if (!hasOffset(row.bedtime) || !hasOffset(row.wake_time) || !Number.isFinite(start) ||\n          !Number.isFinite(end) || end <= start || seconds <= 0 || seconds * 1000 > end - start) {\n        invalidSleep = true;\n        continue;\n      }\n      let wakeDate;\n      if (!row.record_timezone && row.record_utc_offset_minutes != null) {\n        const offset = Number(row.record_utc_offset_minutes);\n        if (!Number.isFinite(offset) || Math.abs(offset) > 840) throw new Error('Invalid recorded sleep UTC offset.');\n        wakeDate = new Date(end + offset * 60000).toISOString().slice(0, 10);\n      } else {\n        const parts = Object.fromEntries(new Intl.DateTimeFormat('en-CA', {\n          timeZone: row.record_timezone || config.timezone, year: 'numeric', month: '2-digit', day: '2-digit',\n        }).formatToParts(new Date(end)).map(part => [part.type, part.value]));\n        wakeDate = `${parts.year}-${parts.month}-${parts.day}`;\n      }\n      if (dayString(row.entry_date) !== date || wakeDate !== date) {\n        invalidSleep = true;\n        continue;\n      }\n      candidates.set(`${start}/${end}/${seconds}`, { seconds, source: row.source });\n    }\n    if (invalidSleep || candidates.size > 1) {\n      issues.push('sleep_hours withheld: invalid, incorrectly dated, or conflicting sleep records. No durations are added together.');\n    } else if (candidates.size === 1) {\n      fields.sleep_hours = round([...candidates.values()][0].seconds / 3600);\n    }\n    const labels = {\n      calories_kcal: ['Energy', 'kcal'], protein_g: ['Protein', 'g'], carbs_g: ['Carbohydrate', 'g'],\n      fat_g: ['Fat', 'g'], fiber_g: ['Fibre', 'g'], water_ml: ['Water', 'ml'],\n      weight_kg: ['Weight', 'kg'], steps: ['Steps', ''], sleep_hours: ['Sleep', 'hours'],\n    };\n    const lines = [\n      '<!-- sparkyfitness:start -->', '## SparkyFitness', '',\n      `Recorded date: ${date} | [Source](${config.sparkyBaseUrl}/)`, '',\n      'Logged totals only; missing values do not mean zero or a completed day.', '',\n      '| Metric | Recorded value |', '| --- | --- |',\n    ];\n    for (const [key, [label, unit]] of Object.entries(labels)) {\n      if (fields[key] !== undefined) lines.push(`| ${label} | ${fields[key]}${unit ? ` ${unit}` : ''} |`);\n    }\n    if (Object.keys(fields).length === 0) lines.push('| Observations | None available |');\n    const absent = Object.entries(labels).filter(([key]) => fields[key] === undefined).map(([, value]) => value[0]);\n    if (absent.length) lines.push('', `Not available: ${absent.join(', ')}.`);\n    if (entries.length) {\n      lines.push('', '### Food diary', '', '| Meal | Time | Food | Quantity |',\n        '| --- | --- | --- | --- |');\n      for (const entry of entries) {\n        lines.push(`| ${cell(entry.meal_type || 'Unspecified')} | ${cell(entry.entry_time || '')} | ${cell(entry.food_name || '[name not supplied]')} | ${numeric(entry.quantity, 'quantity')} ${cell(entry.unit || '')} |`);\n      }\n    }\n    if (hasSupplements) lines.push('', 'Nutrition totals include recorded supplements.');\n    if (fields.sleep_hours !== undefined) {\n      lines.push('', `Sleep source: ${cell([...candidates.values()][0].source || 'not supplied')}.`);\n    }\n    if (issues.length) lines.push('', '### Data notes', '', ...issues.map(issue => `- ${issue}`));\n    lines.push('<!-- sparkyfitness:end -->');\n    return { json: { config, date, fields, issues, hasData: Object.keys(fields).length > 0,\n      managedBlock: lines.join('\\n') } };\n  });\n})();"
+      },
+      "id": "219057c0-6bb3-46bb-a4fa-146407537c1d",
+      "name": "Normalize recorded data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        928,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "\nreturn (function buildVaultReads() {\n  const plans = $input.all().map(item => item.json);\n  const config = plans[0].config;\n  const encodePath = value => value.split('/').map(encodeURIComponent).join('/');\n  const requests = [{ json: { kind: 'template', path: config.dailyTemplatePath,\n    url: `${config.obsidianBaseUrl}/vault/${encodePath(config.dailyTemplatePath)}` } }];\n  for (const plan of plans) {\n    const year = plan.date.slice(0, 4);\n    const month = plan.date.slice(0, 7);\n    for (const candidate of [`${year}/${plan.date}.md`, `${year}/${month}/${plan.date}.md`,\n      `z_archive/${year}/${month}/${plan.date}.md`]) {\n      requests.push({ json: { kind: 'note', date: plan.date, path: candidate, plan,\n        url: `${config.obsidianBaseUrl}/vault/${encodePath(candidate)}` } });\n    }\n  }\n  return requests;\n})();"
+      },
+      "id": "422667cd-45d6-4609-b67b-80fb2ac8d7f5",
+      "name": "Build vault reads",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1152,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.url }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/vnd.olrapi.note+json"
+            }
+          ]
+        },
+        "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 1
+            }
+          },
+          "redirect": {
+            "redirect": {
+              "followRedirects": false
+            }
+          },
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          },
+          "timeout": 30000
+        }
+      },
+      "id": "de87fce1-3ae4-40d6-8b31-96306304228d",
+      "name": "Read Obsidian notes",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        1392,
+        80
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "fPeBwVzu65xvnWgy",
+          "name": "Obsidian Local REST API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "function isSyncField(key) {\n  return /^(?:hardcover_|sparkyfitness_|kindle-)/i.test(key);\n}\n\nfunction isSyncObject(value) {\n  if (value === null || typeof value !== 'object' || Array.isArray(value)) return false;\n  // n8n secure mode stubs prototype inspection; validate record shape instead.\n  if (Object.prototype.toString.call(value) !== '[object Object]') return false;\n  if (!Object.hasOwn(value, 'constructor') && value.constructor !== undefined &&\n      (typeof value.constructor !== 'function' || value.constructor.name !== 'Object')) return false;\n  for (const key in value) {\n    if (!Object.hasOwn(value, key)) return false;\n  }\n  return true;\n}\n\nfunction syncJson(value) {\n  const normalize = item => {\n    if (item === null || typeof item === 'string' || typeof item === 'boolean') return item;\n    if (typeof item === 'number' && Number.isFinite(item)) return item;\n    if (Array.isArray(item)) return item.map(normalize);\n    if (isSyncObject(item)) {\n      return Object.fromEntries(Object.keys(item).sort().map(key => [key, normalize(item[key])]));\n    }\n    throw new Error('External-sync metadata must contain only JSON values.');\n  };\n  return JSON.stringify(normalize(value)).replace(/</g, '\\\\u003c').replace(/>/g, '\\\\u003e');\n}\n\nfunction validateSyncProperties(properties) {\n  if (!isSyncObject(properties)) {\n    throw new Error('External-sync properties must be a JSON object.');\n  }\n  const seen = new Set();\n  for (const key of Object.keys(properties)) {\n    if (!isSyncField(key) || seen.has(key.toLowerCase())) {\n      throw new Error(`Unknown or case-conflicting external-sync property: ${key}`);\n    }\n    seen.add(key.toLowerCase());\n  }\n  syncJson(properties);\n  return properties;\n}\n\nfunction readSyncMetadata(content) {\n  const marker = '<!-- external-sync';\n  const count = content.split(marker).length - 1;\n  if (!count) return { properties: {}, start: -1, end: -1 };\n  const matches = [...content.matchAll(/^<!-- external-sync\\r?\\n([\\s\\S]*?)\\r?\\n-->(?=\\r?\\n|$)/gm)];\n  if (count !== 1 || matches.length !== 1) {\n    throw new Error('Malformed or repeated external-sync comment; refusing to edit.');\n  }\n  const match = matches[0];\n  const before = content.slice(0, match.index);\n  const opening = /^\\uFEFF?---[ \\t]*\\r?\\n/.exec(content);\n  const closing = opening && /^(?:---|\\.\\.\\.)[ \\t]*(?:\\r?\\n|$)/m.exec(content.slice(opening[0].length));\n  if (opening && (!closing || match.index < opening[0].length + closing.index + closing[0].length)) {\n    throw new Error('External-sync comments must be outside frontmatter.');\n  }\n  let fence = null;\n  for (const line of before.split(/\\r?\\n/)) {\n    const token = /^ {0,3}(`{3,}|~{3,})(.*)$/.exec(line);\n    if (!token) continue;\n    if (!fence) fence = { character: token[1][0], length: token[1].length };\n    else if (token[1][0] === fence.character && token[1].length >= fence.length && !token[2].trim()) fence = null;\n  }\n  if (fence || before.lastIndexOf('<!--') > before.lastIndexOf('-->')) {\n    throw new Error('External-sync comments must not be inside code fences or other comments.');\n  }\n  let payload;\n  try {\n    payload = JSON.parse(match[1]);\n  } catch (error) {\n    throw new Error(`Invalid external-sync JSON: ${error.message}`);\n  }\n  if (!payload || payload.version !== 1 || Object.keys(payload).sort().join(',') !== 'properties,version') {\n    throw new Error('Unsupported external-sync schema; expected version 1 and properties.');\n  }\n  return { properties: validateSyncProperties(payload.properties), start: match.index,\n    end: match.index + match[0].length };\n}\n\nfunction mergeSyncProperties(content, metadata) {\n  const properties = { ...readSyncMetadata(content).properties };\n  for (const [key, value] of Object.entries(metadata)) {\n    if (!isSyncField(key)) continue;\n    const existing = Object.keys(properties).find(name => name.toLowerCase() === key.toLowerCase());\n    if (existing && syncJson(properties[existing]) !== syncJson(value)) {\n      throw new Error(`Legacy frontmatter and external-sync comment disagree for ${key}.`);\n    }\n    if (!existing) properties[key] = value;\n  }\n  return validateSyncProperties(properties);\n}\n\nfunction writeSyncMetadata(content, properties) {\n  validateSyncProperties(properties);\n  const previous = readSyncMetadata(content);\n  if (!Object.keys(properties).length && previous.start < 0) return content;\n  const eol = content.includes('\\r\\n') ? '\\r\\n' : '\\n';\n  const comment = `<!-- external-sync${eol}${syncJson({ version: 1, properties })}${eol}-->`;\n  const updated = previous.start >= 0\n    ? content.slice(0, previous.start) + comment + content.slice(previous.end)\n    : content + (content.endsWith(eol + eol) ? '' : content.endsWith('\\n') ? eol : eol + eol) + comment + eol;\n  readSyncMetadata(updated);\n  return updated;\n}\nreturn (function prepareNoteUpdates() {\n  const requests = $('Build vault reads').all();\n  const responses = $input.all();\n  if (requests.length !== responses.length) throw new Error('Unexpected number of Obsidian read responses.');\n  const records = requests.map((item, index) => ({ ...item.json, response: responses[index].json }));\n  for (const record of records) {\n    if (![200, 404].includes(record.response.statusCode)) {\n      throw new Error(`Obsidian ${record.path}: HTTP ${record.response.statusCode}. Check the address, API key, and TLS trust.`);\n    }\n    if (record.response.statusCode === 200 &&\n        (!record.response.body || typeof record.response.body.content !== 'string' ||\n         !record.response.body.frontmatter || typeof record.response.body.frontmatter !== 'object')) {\n      throw new Error(`Obsidian ${record.path}: expected application/vnd.olrapi.note+json.`);\n    }\n  }\n  const template = records.find(record => record.kind === 'template');\n  const allowed = new Set(['calories_kcal', 'protein_g', 'carbs_g', 'fat_g', 'fiber_g',\n    'water_ml', 'weight_kg', 'steps', 'sleep_hours']);\n  const updateFrontmatter = (content, values, removals, metadata) => {\n    const bom = content.startsWith('\\uFEFF') ? '\\uFEFF' : '';\n    const text = content.slice(bom.length);\n    const eol = content.includes('\\r\\n') ? '\\r\\n' : '\\n';\n    const opening = /^---[ \\t]*\\r?\\n/.exec(text);\n    let body = '';\n    let tail = text;\n    let head = `---${eol}`;\n    let closing = `---${eol}`;\n    if (opening) {\n      const rest = text.slice(opening[0].length);\n      const end = /^(?:---|\\.\\.\\.)[ \\t]*(?:\\r?\\n|$)/m.exec(rest);\n      if (!end) throw new Error('Unclosed YAML frontmatter; refusing to edit the note.');\n      body = rest.slice(0, end.index);\n      head = opening[0];\n      closing = end[0];\n      tail = rest.slice(end.index + end[0].length);\n    }\n    const lines = body.match(/[^\\n]*(?:\\n|$)/g)?.filter(line => line !== '') || [];\n    const commentOrBlank = line => /^\\s*(?:#.*)?$/.test(line.replace(/\\r?\\n$/, ''));\n    const touched = new Set([...Object.keys(values), ...removals]);\n    const found = new Set();\n    for (let i = lines.length - 1; i >= 0; i--) {\n      const key = /^([A-Za-z_][A-Za-z0-9_-]*):(?:[ \\t]|$)/.exec(lines[i].replace(/\\r?\\n$/, ''));\n      if (!key || !touched.has(key[1])) continue;\n      if (found.has(key[1])) throw new Error(`Duplicate YAML property ${key[1]}; refusing to edit.`);\n      found.add(key[1]);\n      const old = metadata[key[1]];\n      if (old != null && typeof old !== 'number' && !['sparkyfitness_fields', 'sparkyfitness_date'].includes(key[1])) {\n        throw new Error(`Unexpected type for ${key[1]}; refusing to replace user-authored structured content.`);\n      }\n      let end = i + 1;\n      while (end < lines.length && /^(?:[ \\t]+\\S|-[ \\t])/.test(lines[end])) end++;\n      const replacement = Object.hasOwn(values, key[1])\n        ? [`${key[1]}: ${JSON.stringify(values[key[1]])}${eol}`] : [];\n      const rawValue = lines[i].replace(/\\r?\\n$/, '').slice(key[1].length + 1)\n        .replace(/(?:^|\\s+)#.*$/, '').trim();\n      if (key[1] === 'sparkyfitness_fields') {\n        const ownerKey = raw => {\n          const match = /^(?:\"([A-Za-z_]+)\"|'([A-Za-z_]+)'|([A-Za-z_]+))$/.exec(raw.trim());\n          if (!match) throw new Error('Unsupported ownership list item.');\n          return match[1] || match[2] || match[3];\n        };\n        let rawFields;\n        if (rawValue === '') {\n          let cursor = i + 1;\n          let lastValueLine = i;\n          while (cursor < lines.length) {\n            if (commentOrBlank(lines[cursor])) {\n              cursor++;\n              continue;\n            }\n            if (/^\\s*-[ \\t]/.test(lines[cursor])) {\n              lastValueLine = cursor++;\n              continue;\n            }\n            break;\n          }\n          end = lastValueLine + 1;\n          rawFields = end === i + 1 ? null : lines.slice(i + 1, end).filter(line => !commentOrBlank(line))\n            .map(line => ownerKey(line.replace(/^\\s*-[ \\t]+/, '').replace(/\\s+#.*$/, '').trim()));\n          replacement.push(...lines.slice(i + 1, end).filter(commentOrBlank));\n        } else if (!/^\\[.*\\]$/.test(rawValue)) {\n          throw new Error('Unsupported multiline ownership list; use a standard YAML list.');\n        } else {\n          const items = rawValue.slice(1, -1).trim();\n          rawFields = items ? items.replace(/,[ \\t]*$/, '').split(',').map(ownerKey) : [];\n        }\n        if (syncJson(rawFields) !== syncJson(metadata[key[1]])) {\n          throw new Error('Ownership YAML disagrees with the Obsidian metadata cache; wait for indexing and rerun.');\n        }\n      } else {\n        const scalar = key[1] === 'sparkyfitness_date'\n          ? /^(?:\"\\d{4}-\\d{2}-\\d{2}\"|'\\d{4}-\\d{2}-\\d{2}'|\\d{4}-\\d{2}-\\d{2})$/\n          : /^(?:null|~|[-+]?(?:\\d+(?:\\.\\d*)?|\\.\\d+)(?:[eE][-+]?\\d+)?)?$/;\n        if (!scalar.test(rawValue) ||\n            lines.slice(i + 1, end).some(line => !commentOrBlank(line))) {\n          throw new Error(`Nonstandard YAML value for ${key[1]}; refusing to rewrite structured content.`);\n        }\n        if (key[1] === 'sparkyfitness_date' &&\n            rawValue.replace(/^[\"']|[\"']$/g, '') !== metadata[key[1]]) {\n          throw new Error('Ownership date YAML disagrees with the Obsidian metadata cache; wait for indexing and rerun.');\n        }\n        end = i + 1;\n      }\n      if (['sparkyfitness_fields', 'sparkyfitness_date'].includes(key[1]) && !Object.hasOwn(values, key[1])) {\n        const comment = /[ \\t]+(#.*?)(?:\\r?\\n)?$/.exec(lines[i]);\n        if (comment) replacement.unshift(comment[1] + eol);\n      }\n      lines.splice(i, end - i, ...replacement);\n    }\n    for (const key of touched) {\n      if (Object.hasOwn(metadata, key) && !found.has(key)) {\n        throw new Error(`Nonstandard or quoted YAML property ${key}; edit it manually before syncing.`);\n      }\n    }\n    for (const [key, value] of Object.entries(values)) {\n      if (!found.has(key)) lines.push(`${key}: ${JSON.stringify(value)}${eol}`);\n    }\n    return bom + head + lines.join('') + closing + tail;\n  };\n  const updateBlock = (content, block) => {\n    const startMarker = '<!-- sparkyfitness:start -->';\n    const endMarker = '<!-- sparkyfitness:end -->';\n    const starts = content.split(startMarker).length - 1;\n    const ends = content.split(endMarker).length - 1;\n    const eol = content.includes('\\r\\n') ? '\\r\\n' : '\\n';\n    const replacement = block.replace(/\\n/g, eol);\n    if (starts === 0 && ends === 0) {\n      return content + (content.endsWith('\\n') ? eol : eol + eol) + replacement + eol;\n    }\n    const start = content.indexOf(startMarker);\n    const end = content.indexOf(endMarker);\n    if (starts !== 1 || ends !== 1 || end < start ||\n        (start > 0 && content[start - 1] !== '\\n') ||\n        (end > 0 && content[end - 1] !== '\\n')) {\n      throw new Error('Malformed or repeated SparkyFitness markers; refusing to overwrite the note.');\n    }\n    return content.slice(0, start) + replacement + content.slice(end + endMarker.length);\n  };\n  const output = [];\n  const dates = [...new Set(records.filter(record => record.kind === 'note').map(record => record.date))];\n  for (const date of dates) {\n    const candidates = records.filter(record => record.kind === 'note' && record.date === date);\n    const existing = candidates.filter(record => record.response.statusCode === 200);\n    if (existing.length > 1) throw new Error(`${date}: multiple notes exist (${existing.map(record => record.path).join(', ')}). Resolve the duplicate first.`);\n    const plan = candidates[0].plan;\n    const note = existing[0] || candidates[0];\n    const metadata = existing.length ? note.response.body.frontmatter : {};\n    const syncProperties = mergeSyncProperties(existing.length ? note.response.body.content : '', metadata);\n    const previous = Object.hasOwn(syncProperties, 'sparkyfitness_fields') ? syncProperties.sparkyfitness_fields : [];\n    if (!Array.isArray(previous) || previous.some(key => !allowed.has(key)) ||\n        new Set(previous).size !== previous.length) {\n      throw new Error(`${date}: invalid sparkyfitness_fields ownership metadata.`);\n    }\n    if ((previous.length || Object.hasOwn(syncProperties, 'sparkyfitness_date')) &&\n        syncProperties.sparkyfitness_date !== date) {\n      throw new Error(`${date}: ownership date does not match the note filename.`);\n    }\n    const base = { config: plan.config, date, path: note.path, url: note.url,\n      fields: plan.fields, issues: plan.issues, managedBlock: plan.managedBlock };\n    const legacy = ['sparkyfitness_fields', 'sparkyfitness_date'].filter(key => Object.hasOwn(metadata, key));\n    if ((!plan.hasData && previous.length === 0 && !legacy.length) || (!existing.length && !plan.config.createMissingNotes)) {\n      output.push({ json: { ...base, action: !plan.hasData ? 'no-data' : 'missing-note', changes: {} } });\n      continue;\n    }\n    let original;\n    if (existing.length) {\n      original = note.response.body.content;\n    } else {\n      if (template.response.statusCode !== 200) throw new Error('Cannot create a note: the daily template is missing.');\n      if (Object.keys(template.response.body.frontmatter).some(isSyncField) ||\n          Object.keys(mergeSyncProperties(template.response.body.content, {})).length) {\n        throw new Error('The daily template must not contain external sync bookkeeping.');\n      }\n      original = template.response.body.content.replace(/\\{\\{date:YYYY-MM-DD\\}\\}/g, date);\n      if (/\\{\\{[\\s\\S]*?\\}\\}|<%/.test(original)) throw new Error('Daily template has unsupported dynamic placeholders.');\n    }\n    const removals = previous.filter(key => !Object.hasOwn(plan.fields, key));\n    const cleaned = updateFrontmatter(original, plan.fields, [...removals, ...legacy], metadata);\n    const updated = writeSyncMetadata(updateBlock(cleaned, plan.managedBlock),\n      { ...syncProperties, sparkyfitness_fields: Object.keys(plan.fields).sort(), sparkyfitness_date: date });\n    const headers = { 'Content-Type': 'text/markdown' };\n    if (existing.length) {\n      const tag = note.response.body.version || note.response.headers?.etag || note.response.headers?.ETag;\n      if (typeof tag !== 'string' || !tag) throw new Error('Obsidian must provide an ETag/version for safe conditional writes.');\n      headers['If-Match'] = tag;\n    } else {\n      headers['If-None-Match'] = '*';\n    }\n    const changes = {};\n    for (const key of [...Object.keys(plan.fields), ...removals]) {\n      const before = metadata[key] ?? null;\n      const after = plan.fields[key] ?? null;\n      if (before !== after) changes[key] = { before, after };\n    }\n    output.push({ json: { ...base, action: existing.length ? (updated === original ? 'unchanged' : 'update') : 'create',\n      changes, headers, proposedContent: updated } });\n  }\n  return output;\n})();"
+      },
+      "id": "4daa9daa-e76a-460a-a001-a75cc9a87eef",
+      "name": "Prepare note updates",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1616,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "01b07ca1-9250-4c38-ade9-8b6a68a89e73",
+              "leftValue": "={{ $json.config.previewOnly === false && ['update', 'create'].includes($json.action) }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "8471a1e0-658c-47ff-b1d7-11344121103d",
+      "name": "Write enabled?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1840,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "\nreturn (function previewResults() {\n  return $input.all().map(item => {\n    const { date, path, action, fields, changes, issues, managedBlock, config } = item.json;\n    return { json: { date, path, action, previewOnly: config.previewOnly, fields, changes, issues,\n      managedBlock, note: ['update', 'create'].includes(action)\n        ? 'Preview only: no note has been written.' : 'No write required.' } };\n  });\n})();"
+      },
+      "id": "a051ccda-d2de-4568-9243-f72196c8c1fe",
+      "name": "Preview or unchanged",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2080,
+        272
+      ]
+    },
+    {
+      "parameters": {
+        "method": "PUT",
+        "url": "={{ $json.config?.previewOnly === false && ['create', 'update'].includes($json.action) ? $json.url : (() => { throw new Error('Write refused: previewOnly must be false and action must be create/update. Run the full workflow after reviewing the preview.'); })() }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "specifyHeaders": "json",
+        "jsonHeaders": "={{ JSON.stringify($json.headers) }}",
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "text/markdown",
+        "body": "={{ $json.proposedContent }}",
+        "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 1
+            }
+          },
+          "redirect": {
+            "redirect": {
+              "followRedirects": false
+            }
+          },
+          "response": {
+            "response": {
+              "fullResponse": true
+            }
+          },
+          "timeout": 30000
+        }
+      },
+      "id": "d104fa73-818e-4df8-822b-4bf5c9f8f0e0",
+      "name": "Write guarded note",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        2080,
+        0
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "fPeBwVzu65xvnWgy",
+          "name": "Obsidian Local REST API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "={{ $('Write enabled?').item.json.url }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "text/markdown"
+            }
+          ]
+        },
+        "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 1
+            }
+          },
+          "redirect": {
+            "redirect": {
+              "followRedirects": false
+            }
+          },
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "responseFormat": "text",
+              "outputPropertyName": "body"
+            }
+          },
+          "timeout": 30000
+        }
+      },
+      "id": "b28b8cd7-b574-409a-bc15-21a1df6ace73",
+      "name": "Read back written note",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        2304,
+        0
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "fPeBwVzu65xvnWgy",
+          "name": "Obsidian Local REST API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "\nreturn (function verifyWrites() {\n  const expected = $('Write enabled?').all(0);\n  const actual = $input.all();\n  if (expected.length !== actual.length) throw new Error('Unexpected number of verification responses.');\n  return actual.map((item, index) => {\n    const plan = expected[index].json;\n    if (item.json.statusCode !== 200 || item.json.body !== plan.proposedContent) {\n      throw new Error(`${plan.path}: read-back differs from the submitted note. Inspect for concurrent/Seafile edits; nothing will be overwritten again in this run.`);\n    }\n    return { json: { date: plan.date, path: plan.path, action: plan.action,\n      verified: true, fields: plan.fields, issues: plan.issues } };\n  });\n})();"
+      },
+      "id": "f3c64f55-a980-431d-a814-c67e4c0835fd",
+      "name": "Verify persisted content",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2544,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "content": "# SparkyFitness -> Obsidian\n\nBuilt for n8n 2.44.6 and SparkyFitness v1.9.0. Imported INACTIVE and PREVIEW ONLY.\n\n## Credentials (never paste secrets into Settings)\nCreate an HTTP Header Auth credential named \"SparkyFitness read-only\":\n- Header name: X-API-Key\n- Value: a read-scope API key created in your SparkyFitness settings.\n- Assign it to Read SparkyFitness.\nCreate an HTTP Header Auth credential named \"Obsidian Local REST API\":\n- Header name: Authorization\n- Value: Bearer followed by a space and your VM Obsidian REST API key.\n- Assign it to Read Obsidian notes, Write guarded note, and Read back written note.\n\n## First run\n1. Open Settings. Confirm the VM REST URL, Europe/Madrid timezone, and template path.\n2. Confirm n8n can resolve/reach the HTTPS hostname below; do not disable certificate checks.\n3. Run the whole workflow from Manual preview, not Execute step on a write node. Inspect Preview or unchanged.\nThe PUT node also checks previewOnly=false and a create/update action before resolving its URL.\n4. After approving the preview, set previewOnly=false and execute manually once.\n5. Inspect Verify persisted content and the resulting notes before publishing/activating.\n\n## Networking\nn8n runs in a separate Proxmox LXC at 192.168.178.75.\nObsidian runs in the VM at 192.168.178.44.\nNginx Proxy Manager provides https://obsidian.ggarcia24.work with a trusted certificate.\nThis URL returned Obsidian REST API 5.5.2 with normal TLS verification during setup.\nUse that hostname, NOT localhost or the bare VM IP. No custom CA credential is needed in n8n.\nPrefer internal DNS routing from the LXC to NPM; no Cloudflare tunnel is needed for LAN traffic.\nEach HTTP node spaces request starts by 1000 ms to avoid lookup/request bursts.\nGET nodes allow up to 3 node attempts, waiting 2000 ms between attempts; a retry repeats the read batch.\nConditional PUT nodes are never automatically retried. Persistent DNS failures still require resolver repair.\nKeep the proxy host LAN/VPN-restricted and preserve Authorization, If-Match and If-None-Match headers.\nAllow GET and PUT through the proxy; do not cache API note responses.\nNPM-to-VM upstream settings have not been inspected: trusted frontend TLS does not validate that hop.\nFor verified HTTPS upstream, trust the Obsidian CA in NPM and use a matching certificate hostname.\nIf choosing HTTP upstream instead, it is unencrypted: restrict that VM port to NPM on a trusted network.\n\n## Behavior\nEvery hour at :15, re-read today plus the previous two calendar days.\nSource is SparkyFitness only. No MyFitnessPal/Strong/Huawei calls or write-back.\nNutrition matches reference-serving scaling and includes supplement totals.\nCalorie reconciliation rounds the unrounded food-plus-supplement sum to whole kcal, matching SparkyFitness.\nGenuine calorie disagreements stop the run and show calculated, rounded and reported totals.\nNo food/supplement log means unknown nutrition, not fabricated zeros.\nA zero hydration aggregate cannot prove an observation, so water_ml is omitted.\nWeight/steps are exact-day check-ins, never carry-forward values.\nConflicting check-ins or sleep records are withheld and explained, not summed.\nSleep uses explicit time asleep when available, otherwise SparkyFitness recorded duration.\nSleep must fit its window and match its recorded-local wake date.\nOptionally set sleepSource to an exact source string visible in SparkyFitness.\nNo workouts, active_minutes, habits, or planning properties are changed.\n\n## Notes and ownership\nCreate new notes at YYYY/YYYY-MM-DD.md; reuse YYYY/YYYY-MM/YYYY-MM-DD.md or z_archive/YYYY/YYYY-MM/YYYY-MM-DD.md if already present.\nMonthly reviews can move completed months into YYYY/YYYY-MM/; current-month notes stay in the year root.\nIf multiple candidate notes exist, stop instead of choosing a duplicate.\nMissing notes with data use the current _templates/daily_note.md, substituting its date.\nOnly YYYY-MM-DD date placeholders are supported; unknown dynamic syntax stops creation.\nUpdate only recorded metric properties in frontmatter. Technical sync bookkeeping belongs in a hidden external-sync comment.\nThe comment contains JSON: {\"version\":1,\"properties\":{\"sparkyfitness_fields\":[\"steps\"],\"sparkyfitness_date\":\"2026-10-24\"}}.\nPlace that JSON between standalone <!-- external-sync and --> lines outside frontmatter and generated sections.\nLegacy ownership properties are relocated automatically on the next recorded/owned-day update.\nConflicting legacy/comment values, malformed comments or mismatched dates stop writes rather than discarding ownership.\nOnly fields previously owned by this workflow can be removed when observations disappear.\nOther frontmatter, handwritten text, and the existing fitness-db block are preserved.\nThe separate sparkyfitness:start/end block is machine-owned; keep handwriting outside it.\nWrites are exact-text splices submitted with conditional PUT (If-Match/If-None-Match),\nnot unconditional replacements. A 412 means re-read/re-run, never bypass the guard.\nExisting-note guards prefer the note JSON file version, not its metadata representation ETag.\nRaw PUT responses use Autodetect so n8n consumes response streams, including empty HTTP 204 bodies.\nText read-back responses are placed in body for exact comparison by Verify persisted content.\nA response-handling error can occur after successful writes. Re-read the full window before retrying.\nEvery written note is read back and compared byte-for-byte.\nStable data makes no changes. No import timestamp is rewritten on every run.\n\n## Operational limits\nSeafile can still create conflicts with remote simultaneous edits. Inspect SFConflict files.\nNo overlap lock is assumed: conditional writes stop stale local snapshots.\nAfter downtime longer than the window, increase lookbackDays (max 31) or use endDateOverride.\nA run can stop after some dates were written; those are verified by the next idempotent run.\nUnexpected API responses, permissions, TLS, ambiguous YAML, or invalid data fail explicitly.\nDo not pin real health data or share execution exports. Automatic and manual payload retention is disabled.\nLive API authentication, a real-data preview, and import into your n8n instance have not been performed.",
+        "height": 1800,
+        "width": 1050,
+        "color": 5
+      },
+      "id": "0587f034-6eec-4631-a0a8-2256de726ac5",
+      "name": "Setup and safety",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        0,
+        432
+      ]
+    }
+  ],
+  "pinData": {},
+  "repo_name": "n8n-backups",
+  "repo_owner": "ggarcia24",
+  "repo_path": "workflows/",
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": true,
+    "timeSavedMode": "fixed",
+    "errorWorkflow": "2GN7mz2z9WCtSJAp",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "shared": [
+    {
+      "role": "workflow:owner",
+      "workflowId": "X8ziv1mJ0BoORpSf",
+      "projectId": "53XBnFAeVo99S8g5",
+      "createdAt": "2026-10-27T11:46:57.527Z",
+      "updatedAt": "2026-10-27T11:46:57.527Z"
+    }
+  ],
+  "staticData": {
+    "node:Hourly reconciliation": {
+      "recurrenceRules": [
+        null
+      ],
+      "recurrenceRuleSignatures": [
+        null
+      ]
+    }
+  },
+  "tags": [],
+  "triggerCount": 1,
+  "updatedAt": "2026-10-27T12:28:35.839Z",
+  "versionId": "521e84e6-7a72-43d2-abee-22a400b62047"
+}
