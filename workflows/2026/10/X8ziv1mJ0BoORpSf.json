@@ -1,7 +1,7 @@
 {
   "active": true,
   "activeVersion": {
-    "versionId": "521e84e6-7a72-43d2-abee-22a400b62047",
+    "versionId": "15a8dd96-9f86-49a9-a80e-6821266fed42",
     "workflowId": "X8ziv1mJ0BoORpSf",
     "nodes": [
       {
@@ -123,7 +123,7 @@
         "parameters": {
           "url": "={{ $json.url }}",
           "authentication": "genericCredentialType",
-          "genericAuthType": "httpHeaderAuth",
+          "genericAuthType": "httpBearerAuth",
           "options": {
             "batching": {
               "batch": {
@@ -156,8 +156,8 @@
         "maxTries": 3,
         "waitBetweenTries": 2000,
         "credentials": {
-          "httpHeaderAuth": {
-            "id": "kicijhQjKvp31Xfo",
+          "httpBearerAuth": {
+            "id": "8zh0SoQ1dJhtCUnG",
             "name": "SparkyFitness read-only"
           }
         }
@@ -574,13 +574,13 @@
     },
     "nodeGroups": [],
     "authors": "Gonzalo Garcia",
-    "name": "Version 521e84e6",
+    "name": "Version 15a8dd96",
     "description": "",
     "autosaved": true,
-    "createdAt": "2026-10-27T11:48:42.913Z",
-    "updatedAt": "2026-10-27T12:28:10.000Z"
+    "createdAt": "2026-10-29T18:10:10.837Z",
+    "updatedAt": "2026-10-29T21:43:36.000Z"
   },
-  "activeVersionId": "521e84e6-7a72-43d2-abee-22a400b62047",
+  "activeVersionId": "15a8dd96-9f86-49a9-a80e-6821266fed42",
   "connections": {
     "Manual preview": {
       "main": [
@@ -848,7 +848,7 @@
       "parameters": {
         "url": "={{ $json.url }}",
         "authentication": "genericCredentialType",
-        "genericAuthType": "httpHeaderAuth",
+        "genericAuthType": "httpBearerAuth",
         "options": {
           "batching": {
             "batch": {
@@ -881,8 +881,8 @@
       "maxTries": 3,
       "waitBetweenTries": 2000,
       "credentials": {
-        "httpHeaderAuth": {
-          "id": "kicijhQjKvp31Xfo",
+        "httpBearerAuth": {
+          "id": "8zh0SoQ1dJhtCUnG",
           "name": "SparkyFitness read-only"
         }
       }
@@ -1189,6 +1189,6 @@
   },
   "tags": [],
   "triggerCount": 1,
-  "updatedAt": "2026-10-27T12:28:35.839Z",
-  "versionId": "521e84e6-7a72-43d2-abee-22a400b62047"
+  "updatedAt": "2026-10-29T18:10:10.836Z",
+  "versionId": "15a8dd96-9f86-49a9-a80e-6821266fed42"
 }
