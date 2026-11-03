@@ -49,7 +49,13 @@
     },
     "Read SparkyFitness": {
       "main": [
-        []
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Normalize recorded data": {
@@ -236,7 +242,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const config = $input.first().json;\nconst DAY_CONVERTER = 24 * 60 * 60 * 1000;\n\nfunction getMetrics(date) {\n  // obisidian_property: endpoint\n  const metrics = {};\n  metrics[`measurements/check-in/${date}`] = {\n      weight: 'weight',\n      steps: 'steps',\n  }\n  metrics[`food-entries/nutrition/today?date=${date}`] = {\n    calories: 'total_calories',\n    protein: 'total_protein',\n    carbs: 'total_carbs',\n    fat: 'total_fat',\n    fiber: 'total_dietary_fiber',\n  }\n  metrics[`sleep?startDate=${date}&endDate=${date}`] = {\n    sleep: 'duration_in_seconds'\n  }\n  \n  metrics[`measurements/water-intake/${date}`] = {\n    water: 'waterIntake'\n  }\n  return metrics;\n}\n\nfunction formatDate(date) {\n  return date.toISOString().slice(0, 10)\n}\n\nfunction createResponseItem(date) {\n  const response = []\n  // Get metrics returns the URLs and the properties that need to be extracted\n  // and the targets in the obsidian notes\n  for (const [url, mappings] of Object.entries(getMetrics(date))) {\n    const test = {\n      url,\n      mappings\n    }\n    response.push(test);\n  }\n  return response;\n}\n\n\n\nif (!Number.isInteger(config.lookbackDays) || config.lookbackDays < 1 || config.lookbackDays > 31) {\n  throw new Error('lookbackDays must be an integer from 1 to 31.');\n}\n\n\nconst todayDate = new Date();\nconst maxEndDate = config.endDateOverride || formatDate(new Date(Date.now() - config.lookbackDays * DAY_CONVERTER));\n\nconst todayRequests = createResponseItem(formatDate(todayDate)));\n\nlet daysRequest = [];\nfor (let index = 1; index < config.lookbackDays; index++) {\n  const theDate = formatDate(new Date(todayDate - (index * DAY_CONVERTER)));\n  if (maxEndDate == theDate) {\n    break;\n  }\n  \n  daysRequest = daysRequest.concat(createResponseItem(\n    theDate\n  ))\n}\n\nreturn todayRequests.concat(daysRequest);"
+        "jsCode": "const config = $input.first().json;\nconst DAY_CONVERTER = 24 * 60 * 60 * 1000;\nconst todayDate = new Date();\n\nfunction formatDate(date) {\n  return date.toISOString().slice(0, 10)\n}\n\nfunction getMetricsForDate(date) {\n  // obisidian_property: endpoint\n  return [\n    {\n      url: `measurements/check-in/${date}`,\n      mappgins: {\n        weight: 'weight',\n        steps: 'steps',\n      },\n    },\n    {\n      url: `food-entries/nutrition/today?date=${date}`,\n      mappgins: {\n        calories: 'total_calories',\n        protein: 'total_protein',\n        carbs: 'total_carbs',\n        fat: 'total_fat',\n        fiber: 'total_dietary_fiber',\n      }\n    },\n    {\n      url: `sleep?startDate=${date}&endDate=${date}`,\n      mappgins: {\n        sleep: 'duration_in_seconds'\n      }\n    },\n    {\n      url: `measurements/water-intake/${date}`,\n      mappgins: {\n        water: 'waterIntake'\n      }\n    },\n  ];\n}\n\n\n\nif (!Number.isInteger(config.lookbackDays) || config.lookbackDays < 1 || config.lookbackDays > 31) {\n  throw new Error('lookbackDays must be an integer from 1 to 31.');\n}\n\n\nconst maxEndDate = config.endDateOverride || formatDate(new Date(Date.now() - config.lookbackDays * DAY_CONVERTER));\n\nconst todayRequests = getMetricsForDate(formatDate(todayDate));\n\nlet daysRequest = [];\nfor (let index = 1; index < config.lookbackDays; index++) {\n  const theDate = formatDate(new Date(todayDate - (index * DAY_CONVERTER)));\n  if (maxEndDate == theDate) {\n    break;\n  }\n  const newDayRequest = getMetricsForDate(\n    theDate\n  )\n  console.log(newDayRequest);\n  daysRequest = daysRequest.concat(newDayRequest)\n  console.log(daysRequest)\n}\n\nreturn todayRequests.concat(daysRequest);"
       },
       "id": "2e153641-a82c-4f47-90d1-76bf8517fd30",
       "name": "Build source requests",
@@ -249,7 +255,7 @@
     },
     {
       "parameters": {
-        "url": "={{ $('Settings').item.json.sparkyBaseUrl }}/api/{{ $json.endpoint }}",
+        "url": "={{ $('Settings').item.json.sparkyBaseUrl }}/api/{{ $json.url }}",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpBearerAuth",
         "options": {
@@ -277,12 +283,13 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
       "position": [
-        768,
+        672,
         80
       ],
       "retryOnFail": true,
       "maxTries": 3,
       "waitBetweenTries": 2000,
+      "alwaysOutputData": false,
       "credentials": {
         "httpBearerAuth": {
           "id": "8zh0SoQ1dJhtCUnG",
@@ -541,6 +548,37 @@
         3312,
         -48
       ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "ed1014dd-edad-4c3d-9aa7-053adfd6fe0f",
+              "name": "response",
+              "value": "={{ $json.body }}",
+              "type": "object"
+            },
+            {
+              "id": "52ceac92-373f-4d0e-b273-5088ec3ce2b9",
+              "name": "mappgins",
+              "value": "={{ $('Build source requests').item.json.mappgins }}",
+              "type": "object"
+            }
+          ]
+        },
+        "options": {
+          "ignoreConversionErrors": true
+        }
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        928,
+        80
+      ],
+      "id": "8b97e5f2-5aed-4cd4-a8e1-769d0106a73d",
+      "name": "Edit Fields"
     }
   ],
   "pinData": {},
@@ -567,6 +605,6 @@
   "staticData": null,
   "tags": [],
   "triggerCount": 0,
-  "updatedAt": "2026-10-30T00:04:18.486Z",
-  "versionId": "251808cf-093e-40f3-8b97-abe4854a6ab6"
+  "updatedAt": "2026-10-30T18:09:47.694Z",
+  "versionId": "3c28cbde-35df-4540-9285-c98216ee9465"
 }
