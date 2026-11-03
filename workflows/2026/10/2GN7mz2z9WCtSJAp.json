@@ -1,7 +1,7 @@
 {
   "active": true,
   "activeVersion": {
-    "versionId": "a35deb04-2725-4fea-a6e1-b59d09d47252",
+    "versionId": "88e2f25e-cbe4-4037-bc2c-aa0e1084aafd",
     "workflowId": "2GN7mz2z9WCtSJAp",
     "nodes": [
       {
@@ -9,8 +9,8 @@
         "type": "n8n-nodes-base.errorTrigger",
         "typeVersion": 1,
         "position": [
-          -480,
-          -32
+          -608,
+          -128
         ],
         "id": "d2081c20-4330-4464-b3dd-84473c8af987",
         "name": "Error Trigger"
@@ -27,8 +27,8 @@
             "conditions": [
               {
                 "id": "3096618a-b524-4cab-95d6-f6a5fc0803f5",
-                "leftValue": "",
-                "rightValue": "",
+                "leftValue": "true",
+                "rightValue": "true",
                 "operator": {
                   "type": "string",
                   "operation": "equals",
@@ -43,8 +43,8 @@
         "type": "n8n-nodes-base.if",
         "typeVersion": 2.4,
         "position": [
-          -240,
-          -32
+          -336,
+          -128
         ],
         "id": "73c28a69-5b21-4251-93c7-6c09e72c8f8c",
         "name": "If"
@@ -52,7 +52,7 @@
       {
         "parameters": {
           "method": "POST",
-          "url": "https://notify.ggarcia24.work/phone_alerts",
+          "url": "https://notify.ggarcia24.work/n8n_errors",
           "authentication": "genericCredentialType",
           "genericAuthType": "httpBearerAuth",
           "sendHeaders": true,
@@ -78,14 +78,14 @@
           },
           "sendBody": true,
           "contentType": "raw",
-          "body": "={{ $json.execution.error }}",
+          "body": "={{ $json.execution.lastNodeExecuted }}\n\n{{ $json.execution.error.message }}",
           "options": {}
         },
         "type": "n8n-nodes-base.httpRequest",
         "typeVersion": 4.5,
         "position": [
-          -16,
-          -128
+          -32,
+          -304
         ],
         "id": "03632287-f8a1-49da-9cf3-2859130d7fef",
         "name": "HTTP Request",
@@ -123,13 +123,13 @@
     },
     "nodeGroups": [],
     "authors": "Gonzalo Garcia",
-    "name": "Error Notification Workflow",
-    "description": null,
+    "name": "Version 88e2f25e",
+    "description": "",
     "autosaved": true,
-    "createdAt": "2026-10-26T01:24:48.711Z",
-    "updatedAt": "2026-10-26T01:25:47.000Z"
+    "createdAt": "2026-10-27T15:06:32.512Z",
+    "updatedAt": "2026-10-27T15:06:38.000Z"
   },
-  "activeVersionId": "a35deb04-2725-4fea-a6e1-b59d09d47252",
+  "activeVersionId": "88e2f25e-cbe4-4037-bc2c-aa0e1084aafd",
   "connections": {
     "Error Trigger": {
       "main": [
@@ -209,7 +209,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "https://notify.ggarcia24.work/phone_alerts",
+        "url": "https://notify.ggarcia24.work/n8n_errors",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpBearerAuth",
         "sendHeaders": true,
@@ -275,6 +275,6 @@
   "staticData": null,
   "tags": [],
   "triggerCount": 0,
-  "updatedAt": "2026-10-26T01:38:02.417Z",
-  "versionId": "3554bbd6-4de5-4f91-89c6-af7dacac8d72"
+  "updatedAt": "2026-10-27T15:06:32.511Z",
+  "versionId": "88e2f25e-cbe4-4037-bc2c-aa0e1084aafd"
 }
