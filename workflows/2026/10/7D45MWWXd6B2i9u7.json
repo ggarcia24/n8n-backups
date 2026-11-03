@@ -1,22 +1,302 @@
 {
-  "active": false,
-  "activeVersion": null,
-  "activeVersionId": null,
+  "active": true,
+  "activeVersion": {
+    "versionId": "79ecd053-8a61-46c0-8bef-aa6fb96af822",
+    "workflowId": "7D45MWWXd6B2i9u7",
+    "nodes": [
+      {
+        "parameters": {
+          "pollTimes": {
+            "item": [
+              {
+                "mode": "everyX",
+                "value": 30,
+                "unit": "minutes"
+              }
+            ]
+          },
+          "maxResults": 20,
+          "filters": {
+            "sender": ""
+          }
+        },
+        "type": "n8n-nodes-base.gmailTrigger",
+        "typeVersion": 1.4,
+        "position": [
+          -832,
+          -304
+        ],
+        "id": "58f8c1a2-ae96-420d-bdb7-527baaa788cc",
+        "name": "Gmail Trigger",
+        "credentials": {
+          "gmailOAuth2": {
+            "id": "kgdmXnWubdvjCrbs",
+            "name": "Gmail account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "options": {
+              "caseSensitive": false,
+              "leftValue": "",
+              "typeValidation": "strict",
+              "version": 4
+            },
+            "conditions": [
+              {
+                "id": "74c94c14-3d80-4238-a410-e4cbcff9116c",
+                "leftValue": "={{ $json.Subject }}",
+                "rightValue": "EDEKA\\s.*\\sIhren\\sEinkauf",
+                "operator": {
+                  "type": "string",
+                  "operation": "regex"
+                }
+              }
+            ],
+            "combinator": "and"
+          },
+          "options": {
+            "ignoreCase": true
+          }
+        },
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2.4,
+        "position": [
+          -512,
+          -224
+        ],
+        "id": "6f42d618-cf1d-4b58-a6f4-7a9d84a2b5a1",
+        "name": "If",
+        "alwaysOutputData": false
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "https://notify.ggarcia24.work/purchases",
+          "authentication": "genericCredentialType",
+          "genericAuthType": "httpBearerAuth",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "X-Title",
+                "value": "Edeka Purchase"
+              }
+            ]
+          },
+          "sendBody": true,
+          "contentType": "raw",
+          "body": "=You purchased these things:\n\n{{ $json.rawText }}",
+          "options": {}
+        },
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.5,
+        "position": [
+          544,
+          -144
+        ],
+        "id": "068c59ef-3227-40f4-9e90-639d434b092e",
+        "name": "HTTP Request",
+        "credentials": {
+          "httpBearerAuth": {
+            "id": "qICXH0s3niRMKXoP",
+            "name": "NTFY Token"
+          }
+        }
+      },
+      {
+        "parameters": {},
+        "type": "n8n-nodes-base.manualTrigger",
+        "typeVersion": 1,
+        "position": [
+          -832,
+          -128
+        ],
+        "id": "4995672d-103d-4d9c-be7a-0c051309e583",
+        "name": "When clicking ‘Execute workflow’"
+      },
+      {
+        "parameters": {
+          "operation": "get",
+          "messageId": "={{ $json.id }}",
+          "simple": false,
+          "options": {
+            "downloadAttachments": true
+          }
+        },
+        "type": "n8n-nodes-base.gmail",
+        "typeVersion": 2.2,
+        "position": [
+          -224,
+          -240
+        ],
+        "id": "d56d3342-e7c1-4684-92ec-eca6cb514ea8",
+        "name": "Get a message",
+        "webhookId": "1b46bb82-6541-4e6d-aeb4-ab72d4c71976",
+        "credentials": {
+          "gmailOAuth2": {
+            "id": "kgdmXnWubdvjCrbs",
+            "name": "Gmail account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "operation": "pdf",
+          "binaryPropertyName": "={{ $('Get a message').item.binary.attachment_0 }}",
+          "options": {
+            "joinPages": true
+          }
+        },
+        "type": "n8n-nodes-base.extractFromFile",
+        "typeVersion": 1.2,
+        "position": [
+          -32,
+          -240
+        ],
+        "id": "7927109b-c775-4440-af9a-9fa0fe6c39bc",
+        "name": "Extract from File"
+      },
+      {
+        "parameters": {
+          "jsCode": "const regex = /^(?<name>.+)\\s(?<price>[0-9\\,]+)\\s(?<kind>AW|B|A)/;\nconst ticketText = $input.first().json.text;\n\nconst start = ticketText.indexOf(\"EUR\");\nconst end = ticketText.indexOf(\"Posten:\");\n\nconst rawText = ticketText.slice(start+3, end).trim();\n\nconst products = [];\n\nfor (const line of rawText.split(\"\\n\")) {\n  const matches = line.match(regex);\n  if (matches) {\n    const {name, price, kind} = matches.groups;\n    const product = {\n      name,\n      price,\n      kind,\n    }\n    products.push(product)\n  }\n}\nreturn {\n  rawText,\n  products,\n}\n"
+        },
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          144,
+          -240
+        ],
+        "id": "e112f65a-2e2f-4433-ade1-7937eb5f9a5f",
+        "name": "Code in JavaScript"
+      },
+      {
+        "parameters": {
+          "fieldToSplitOut": "products",
+          "options": {}
+        },
+        "type": "n8n-nodes-base.splitOut",
+        "typeVersion": 1.1,
+        "position": [
+          544,
+          -336
+        ],
+        "id": "8155475f-b841-4cb0-b806-f9517a771ef7",
+        "name": "Split Out"
+      },
+      {
+        "parameters": {
+          "height": 592,
+          "width": 736
+        },
+        "type": "n8n-nodes-base.stickyNote",
+        "position": [
+          -880,
+          96
+        ],
+        "typeVersion": 1,
+        "id": "20dbf65d-3344-4f7f-b56a-982739da6fcd",
+        "name": "Sticky Note"
+      }
+    ],
+    "connections": {
+      "Gmail Trigger": {
+        "main": [
+          [
+            {
+              "node": "If",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "If": {
+        "main": [
+          [
+            {
+              "node": "Get a message",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          []
+        ]
+      },
+      "When clicking ‘Execute workflow’": {
+        "main": [
+          [
+            {
+              "node": "If",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Get a message": {
+        "main": [
+          [
+            {
+              "node": "Extract from File",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Extract from File": {
+        "main": [
+          [
+            {
+              "node": "Code in JavaScript",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Code in JavaScript": {
+        "main": [
+          [
+            {
+              "node": "Split Out",
+              "type": "main",
+              "index": 0
+            },
+            {
+              "node": "HTTP Request",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "HTTP Request": {
+        "main": [
+          []
+        ]
+      },
+      "Split Out": {
+        "main": [
+          []
+        ]
+      }
+    },
+    "nodeGroups": [],
+    "authors": "Gonzalo Garcia",
+    "name": "Version 79ecd053",
+    "description": "",
+    "autosaved": true,
+    "createdAt": "2026-10-29T10:33:48.129Z",
+    "updatedAt": "2026-10-29T10:34:23.000Z"
+  },
+  "activeVersionId": "79ecd053-8a61-46c0-8bef-aa6fb96af822",
   "connections": {
     "Gmail Trigger": {
       "main": [
-        [
-          {
-            "node": "Loop Over Items",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Loop Over Items": {
-      "main": [
-        [],
         [
           {
             "node": "If",
@@ -35,20 +315,14 @@
             "index": 0
           }
         ],
-        [
-          {
-            "node": "Loop Over Items",
-            "type": "main",
-            "index": 0
-          }
-        ]
+        []
       ]
     },
     "When clicking ‘Execute workflow’": {
       "main": [
         [
           {
-            "node": "Loop Over Items",
+            "node": "If",
             "type": "main",
             "index": 0
           }
@@ -71,6 +345,33 @@
         [
           {
             "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Split Out",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        []
+      ]
+    },
+    "Split Out": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request1",
             "type": "main",
             "index": 0
           }
@@ -120,19 +421,6 @@
     },
     {
       "parameters": {
-        "options": {}
-      },
-      "type": "n8n-nodes-base.splitInBatches",
-      "typeVersion": 3,
-      "position": [
-        -384,
-        -160
-      ],
-      "id": "9dce6dc1-2e9e-445e-8e83-cf2d4e0cf351",
-      "name": "Loop Over Items"
-    },
-    {
-      "parameters": {
         "conditions": {
           "options": {
             "caseSensitive": false,
@@ -160,8 +448,8 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.4,
       "position": [
-        -176,
-        -48
+        -512,
+        -224
       ],
       "id": "6f42d618-cf1d-4b58-a6f4-7a9d84a2b5a1",
       "name": "If",
@@ -184,14 +472,14 @@
         },
         "sendBody": true,
         "contentType": "raw",
-        "body": "Naughty you!",
+        "body": "=You purchased these things:\n\n{{ $json.rawText }}",
         "options": {}
       },
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.5,
       "position": [
-        320,
-        -80
+        384,
+        96
       ],
       "id": "068c59ef-3227-40f4-9e90-639d434b092e",
       "name": "HTTP Request",
@@ -225,8 +513,8 @@
       "type": "n8n-nodes-base.gmail",
       "typeVersion": 2.2,
       "position": [
-        160,
-        -384
+        -224,
+        -240
       ],
       "id": "d56d3342-e7c1-4684-92ec-eca6cb514ea8",
       "name": "Get a message",
@@ -249,24 +537,103 @@
       "type": "n8n-nodes-base.extractFromFile",
       "typeVersion": 1.2,
       "position": [
-        416,
-        -384
+        -32,
+        -240
       ],
       "id": "7927109b-c775-4440-af9a-9fa0fe6c39bc",
       "name": "Extract from File"
     },
     {
       "parameters": {
-        "jsCode": "const ticketText = $input.first().json.text\n\nconst start = ticketText.indexOf(\"EUR\");\nconst end = ticketText.indexOf(\"Posten:\");\n\nconst productsText = ticketText.slice(start+3, end).trim()\n\nconst products = [];\n\nfor (const line of productsText.split(\"\\n\")) {\n    products.push(line)\n}\nreturn {\n  productsText,\n  products,\n}\n"
+        "jsCode": "const regex = /^(?<name>[^0-9]+)((?<unit_price>[0-9\\,]+)\\s€\\sx\\s(?<quantity>[0-9]))?\\s(?<total>[0-9\\,]+)\\s(?<kind>AW|B|A)/;\nconst ticketText = $input.first().json.text;\n\nconst start = ticketText.indexOf(\"EUR\");\nconst end = ticketText.indexOf(\"Posten:\");\n\nconst rawText = ticketText.slice(start+3, end).trim();\n\nconst products = [];\n\nfor (const line of rawText.split(\"\\n\")) {\n  const matches = line.match(regex);\n  if (matches) {\n    let {name, unit_price, quantity, total, kind} = matches.groups;\n    if (!unit_price) {\n      unit_price = total\n      quantity = 1\n    }\n    const product = {\n      name,\n      unit_price,\n      quantity,\n      total,\n      kind,\n    }\n    products.push(product)\n  }\n}\nreturn {\n  rawText,\n  products,\n}\n"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        640,
-        -384
+        208,
+        -240
       ],
       "id": "e112f65a-2e2f-4433-ade1-7937eb5f9a5f",
       "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "products",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1.1,
+      "position": [
+        448,
+        -240
+      ],
+      "id": "8155475f-b841-4cb0-b806-f9517a771ef7",
+      "name": "Split Out"
+    },
+    {
+      "parameters": {
+        "height": 592,
+        "width": 736
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -880,
+        96
+      ],
+      "typeVersion": 1,
+      "id": "20dbf65d-3344-4f7f-b56a-982739da6fcd",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "off_q",
+              "value": "={{ $json.name }}"
+            },
+            {
+              "name": "off_facetsFilters"
+            },
+            {
+              "name": "off_page",
+              "value": "1"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "user-agent",
+              "value": "N8N Workflow/0.1.0 (ggarcia24)"
+            }
+          ]
+        },
+        "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 10000
+            }
+          },
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "responseFormat": "text"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        800,
+        -240
+      ],
+      "id": "a3d2539e-82c9-4c59-9d4e-a36b9618ec86",
+      "name": "HTTP Request1"
     }
   ],
   "pinData": {
@@ -390,19 +757,17 @@
   "staticData": {
     "node:Gmail Trigger": {
       "Gmail Trigger": {
-        "lastTimeChecked": 1793212800,
+        "lastTimeChecked": 1793741337,
         "pendingMessageIds": [],
         "noProgressTicks": 0,
         "possibleDuplicates": [
-          "1a183cfe292d13e9",
-          "1a183ca4b92d90e9",
-          "1a183c97e549e71b"
+          "1a1a350b5ce2da33"
         ]
       }
     }
   },
   "tags": [],
   "triggerCount": 1,
-  "updatedAt": "2026-10-29T03:31:58.291Z",
-  "versionId": "fd554769-7df3-4ad1-aeab-5f12c96d431b"
+  "updatedAt": "2026-10-31T18:25:39.207Z",
+  "versionId": "16aa71f4-66ef-471f-ac55-8cd6bd011575"
 }
