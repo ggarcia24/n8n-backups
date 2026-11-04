@@ -1,7 +1,7 @@
 {
   "active": true,
   "activeVersion": {
-    "versionId": "1859684e-8a07-4427-a3f6-b20c730fc02d",
+    "versionId": "68c7fafa-4a48-4c0a-a035-159809817dd0",
     "workflowId": "jYlhqKmMuhfWKGU9",
     "nodes": [
       {
@@ -409,15 +409,15 @@
           "operation": "get",
           "owner": {
             "__rl": true,
-            "mode": "",
-            "value": "={{ $('Config').first().item.repo_owner }}"
+            "value": "={{ $('Config').first().json.repo_owner }}",
+            "mode": ""
           },
           "repository": {
             "__rl": true,
-            "mode": "",
-            "value": "={{ $('Config').first().item.repo_name }}"
+            "value": "={{ $('Config').first().json.repo_name }}",
+            "mode": ""
           },
-          "filePath": "={{ $('Config').first().item.repo_path }}{{ $('Execute Workflow Trigger').first().json.createdAt.split('-')[0] }}/{{ $('Execute Workflow Trigger').first().json.createdAt.split('-')[1] }}/{{$json.id}}.json",
+          "filePath": "={{ $('Config').first().json.repo_path }}{{ $('Execute Workflow Trigger').first().json.createdAt.split('-')[0] }}/{{ $('Execute Workflow Trigger').first().json.createdAt.split('-')[1] }}/{{$json.id}}.json",
           "asBinaryProperty": false,
           "additionalParameters": {}
         },
@@ -723,13 +723,13 @@
     },
     "nodeGroups": [],
     "authors": "Gonzalo Garcia",
-    "name": "Version 1859684e",
+    "name": "Version 68c7fafa",
     "description": "",
     "autosaved": true,
-    "createdAt": "2026-10-26T23:47:06.226Z",
-    "updatedAt": "2026-10-26T23:47:08.000Z"
+    "createdAt": "2026-11-03T22:01:24.127Z",
+    "updatedAt": "2026-11-04T19:52:18.000Z"
   },
-  "activeVersionId": "1859684e-8a07-4427-a3f6-b20c730fc02d",
+  "activeVersionId": "68c7fafa-4a48-4c0a-a035-159809817dd0",
   "connections": {
     "n8n": {
       "main": [
