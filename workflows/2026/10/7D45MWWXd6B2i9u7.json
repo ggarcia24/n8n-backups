@@ -347,11 +347,6 @@
             "node": "Code in JavaScript",
             "type": "main",
             "index": 0
-          },
-          {
-            "node": "Parse EDEKA receipts",
-            "type": "main",
-            "index": 0
           }
         ]
       ]
@@ -376,160 +371,7 @@
       "main": [
         [
           {
-            "node": "Select rows from a table",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Parse EDEKA receipts": {
-      "main": [
-        [
-          {
-            "node": "Receipt needs review?",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Receipt needs review?": {
-      "main": [
-        [
-          {
-            "node": "Review receipt - inspect parse_issues",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Split receipt products",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Prepare product lookup": {
-      "main": [
-        [
-          {
-            "node": "Postgres - look up confirmed mapping",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Postgres - look up confirmed mapping": {
-      "main": [
-        [
-          {
-            "node": "Resolve mapping result",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Resolve mapping result": {
-      "main": [
-        [
-          {
-            "node": "Confirmed mapping usable?",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Confirmed mapping usable?": {
-      "main": [
-        [
-          {
-            "node": "KNOWN - connect Grocy processing here",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Mapping missing?",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Mapping missing?": {
-      "main": [
-        [
-          {
-            "node": "MISSING - connect Open Food Facts and AI here",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "REVIEW - ambiguous or invalid mapping",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "SAVE ENTRY - validate approved mapping": {
-      "main": [
-        [
-          {
-            "node": "Postgres - save confirmed mapping",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Postgres - save confirmed mapping": {
-      "main": [
-        [
-          {
-            "node": "Verify saved mapping",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Verify saved mapping": {
-      "main": [
-        [
-          {
-            "node": "Prepare product lookup",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Split receipt products": {
-      "main": [
-        [
-          {
-            "node": "Prepare product lookup",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "REVIEW - ambiguous or invalid mapping": {
-      "main": [
-        [
-          {
-            "node": "HTTP Request",
+            "node": "HTTP Request1",
             "type": "main",
             "index": 0
           }
@@ -543,7 +385,7 @@
   "meta": {
     "templateCredsSetupCompleted": true
   },
-  "name": "EDEKA PostgreSQL mapping cache blocks",
+  "name": "Notify Me of Edeka Purchases",
   "nodeGroups": [],
   "nodes": [
     {
@@ -636,8 +478,8 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.5,
       "position": [
-        3264,
-        896
+        384,
+        96
       ],
       "id": "068c59ef-3227-40f4-9e90-639d434b092e",
       "name": "HTTP Request",
@@ -703,13 +545,13 @@
     },
     {
       "parameters": {
-        "jsCode": "const rawProductList = [];\nconst products = [];\n\nfor (const attachment of $input.all()) {\n  console.log(attachment)\n  const regex = /^((?<quantity>\\d€)\\sx(?<price_unit>[0-9,]+))?(?<product_name>.*)\\s(?<total_item>[0-9,]+)(\\s|\\*)(?<category>A|B|AW)$/gm;\n  const ticketText = attachment.json.text;\n  \n  const start = ticketText.indexOf(\"EUR\");\n  const end = ticketText.indexOf(\"Posten:\");\n  \n  const rawText = ticketText.slice(start+3, end).trim();\n\n  rawProductList.push(rawText)\n\n  const matches = rawText.match(regex);\n  console.log(matches);\n  \n    // const matches = line.match(regex);\n    // if (matches) {\n    //   let {name, unit_price, quantity, total, kind} = matches.groups;\n    //   if (!unit_price) {\n    //     unit_price = total\n    //     quantity = 1\n    //   }\n    //   const product = {\n    //     name,\n    //     unit_price,\n    //     quantity,\n    //     total,\n    //     kind,\n    //   }\n    //   products.push(product)\n    // }\n\n\n\n}\nreturn {\n  rawProductList,\n  products,\n}\n"
+        "jsCode": "const regex = /^(?<name>[^0-9]+)((?<unit_price>[0-9\\,]+)\\s€\\sx\\s(?<quantity>[0-9]))?\\s(?<total>[0-9\\,]+)\\s(?<kind>AW|B|A)/;\nconst ticketText = $input.first().json.text;\n\nconst start = ticketText.indexOf(\"EUR\");\nconst end = ticketText.indexOf(\"Posten:\");\n\nconst rawText = ticketText.slice(start+3, end).trim();\n\nconst products = [];\n\nfor (const line of rawText.split(\"\\n\")) {\n  const matches = line.match(regex);\n  if (matches) {\n    let {name, unit_price, quantity, total, kind} = matches.groups;\n    if (!unit_price) {\n      unit_price = total\n      quantity = 1\n    }\n    const product = {\n      name,\n      unit_price,\n      quantity,\n      total,\n      kind,\n    }\n    products.push(product)\n  }\n}\nreturn {\n  rawText,\n  products,\n}\n"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        304,
-        -304
+        208,
+        -240
       ],
       "id": "e112f65a-2e2f-4433-ade1-7937eb5f9a5f",
       "name": "Code in JavaScript"
@@ -722,8 +564,8 @@
       "type": "n8n-nodes-base.splitOut",
       "typeVersion": 1.1,
       "position": [
-        576,
-        -304
+        448,
+        -240
       ],
       "id": "8155475f-b841-4cb0-b806-f9517a771ef7",
       "name": "Split Out"
@@ -744,336 +586,110 @@
     },
     {
       "parameters": {
-        "operation": "select",
-        "schema": {
-          "__rl": true,
-          "value": "public",
-          "mode": "list",
-          "cachedResultName": "public"
-        },
-        "table": {
-          "__rl": true,
-          "value": "=",
-          "mode": "name"
-        },
-        "options": {}
-      },
-      "type": "n8n-nodes-base.postgres",
-      "typeVersion": 2.7,
-      "position": [
-        832,
-        -320
-      ],
-      "id": "e366c86f-4004-4b34-91c2-25a8b67bc572",
-      "name": "Select rows from a table",
-      "credentials": {
-        "postgres": {
-          "id": "CZZJJTuMXpb8aF5I",
-          "name": "Postgres account"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "jsCode": "const itemPattern = /^(?:(?<quantity>\\d+)[ \\t]*\\u20ac[ \\t]*x[ \\t]*(?<unit_price>\\d+,\\d{2})[ \\t]*)?(?<name>.+?)[ \\t]+(?<total>-?\\d+,\\d{2})[ \\t]*\\*?[ \\t]*(?<code>AW|A|B)$/;\nconst weightPattern = /^kg[ \\t]+x[ \\t]*(?<quantity>\\d+,\\d+)[ \\t]+(?<unit_price>\\d+,\\d{2})(?:[ \\t]*\\u20ac[ \\t]*\\/[ \\t]*kg)?$/i;\nconst discountPattern = /^App[ \\t]+Preis[ \\t]*\\/[ \\t]*Rabatt[ \\t]+(?<total>-?\\d+,\\d{2})(?:[ \\t]*\\*?[ \\t]*(?<code>AW|A|B))?$/i;\nconst unitPattern = /^\\u20ac[ \\t]*\\/[ \\t]*kg$/i;\n\nfunction toMinor(value) {\n  const [whole, fraction] = value.replace(/^-/, '').split(',');\n  const amount = Number(whole) * 100 + Number(fraction);\n  if (!Number.isSafeInteger(amount)) {\n    throw new Error(`Money amount exceeds the supported range: ${value}`);\n  }\n  return value.startsWith('-') ? -amount : amount;\n}\n\nreturn $input.all().map((input, inputIndex) => {\n  const products = [];\n  const adjustments = [];\n  const parseIssues = [];\n  let rawText = '';\n  let pendingWeight = null;\n  let previousProduct = null;\n\n  function issue(code, lineNumber, rawLine, reason) {\n    parseIssues.push({ code, line_number: lineNumber, raw_line: rawLine, reason });\n  }\n\n  function discardPendingWeight(reason) {\n    if (pendingWeight) {\n      issue('unattached_weight', pendingWeight.line_number, pendingWeight.raw_line, reason);\n      pendingWeight = null;\n    }\n  }\n\n  function result() {\n    return {\n      json: {\n        ...input.json,\n        retailer_key: 'edeka',\n        receipt_input_index: inputIndex,\n        rawText,\n        products,\n        adjustments,\n        parse_issues: parseIssues,\n        review_required: parseIssues.length > 0,\n      },\n      pairedItem: { item: inputIndex },\n    };\n  }\n\n  const text = input.json?.text;\n  if (typeof text !== 'string' || !text.trim()) {\n    issue('missing_text', 0, '', 'Expected a non-empty $json.text from Extract from File.');\n    return result();\n  }\n\n  const normalizedText = text.replace(/\\r\\n?/g, '\\n').replace(/[\\u00a0\\u202f]/g, ' ');\n  const start = /\\bEUR\\b/.exec(normalizedText);\n  const end = /\\bPosten[ \\t]*:/i.exec(normalizedText);\n  if (!start || !end || end.index <= start.index) {\n    issue('receipt_boundaries', 0, '', 'Could not locate the item section between EUR and Posten:.');\n    return result();\n  }\n\n  rawText = normalizedText.slice(start.index + start[0].length, end.index).trim();\n  if (!rawText) {\n    issue('empty_item_section', 0, '', 'The receipt item section is empty.');\n    return result();\n  }\n\n  for (const [index, rawLine] of rawText.split('\\n').entries()) {\n    const lineNumber = index + 1;\n    const line = rawLine.trim();\n    if (!line) continue;\n\n    if (/^-{3,}$/.test(line)) {\n      discardPendingWeight('A separator was encountered before a product.');\n      previousProduct = null;\n      continue;\n    }\n\n    if (unitPattern.test(line)) {\n      if (!previousProduct || previousProduct.receipt_unit !== 'kg' || pendingWeight) {\n        issue('unattached_unit', lineNumber, line, 'The EUR/kg label has no preceding weighted product.');\n      }\n      continue;\n    }\n\n    const weight = line.match(weightPattern);\n    if (weight) {\n      discardPendingWeight('Another weight line was encountered before a product.');\n      const quantity = Number(weight.groups.quantity.replace(',', '.'));\n      if (!Number.isFinite(quantity) || quantity <= 0) {\n        issue('invalid_quantity', lineNumber, line, 'Weight must be a positive finite number.');\n      }\n      pendingWeight = {\n        quantity,\n        unit_price_minor: toMinor(weight.groups.unit_price),\n        line_number: lineNumber,\n        raw_line: line,\n      };\n      previousProduct = null;\n      continue;\n    }\n\n    const discount = line.match(discountPattern);\n    if (discount) {\n      discardPendingWeight('A discount was encountered before a product.');\n      const amount = toMinor(discount.groups.total);\n      adjustments.push({\n        line_number: lineNumber,\n        raw_description: line,\n        line_kind: 'discount',\n        line_total_minor: amount,\n        receipt_code: discount.groups.code ?? null,\n        applies_to_line_number: previousProduct?.line_number ?? null,\n      });\n      if (!previousProduct || amount >= 0) {\n        issue('unresolved_discount', lineNumber, line, 'Expected a negative discount immediately after a product.');\n      } else {\n        previousProduct.discount_total_minor += amount;\n        previousProduct.net_line_total_minor += amount;\n        if (previousProduct.net_line_total_minor < 0) {\n          issue('negative_net_total', lineNumber, line, 'Discounts exceed the preceding product total.');\n        }\n      }\n      continue;\n    }\n\n    const match = line.match(itemPattern);\n    if (!match) {\n      discardPendingWeight('An unrecognized line was encountered before a product.');\n      issue('unrecognized_line', lineNumber, line, 'This line needs a parsing rule or manual review.');\n      previousProduct = null;\n      continue;\n    }\n\n    const { name, quantity, unit_price: unitPrice, total, code } = match.groups;\n    const isDeposit = /^(?:Pfand\\b|Leerg)/i.test(name);\n    if (pendingWeight && (quantity !== undefined || isDeposit)) {\n      issue('conflicting_quantity', lineNumber, line, 'A weight cannot be combined with a counted item or deposit.');\n    }\n\n    const receiptQuantity = pendingWeight?.quantity ?? Number(quantity ?? 1);\n    const receiptUnit = pendingWeight ? 'kg' : 'item';\n    const lineTotal = toMinor(total);\n    const unitPriceMinor = pendingWeight?.unit_price_minor\n      ?? (unitPrice === undefined ? lineTotal : toMinor(unitPrice));\n\n    if (!Number.isSafeInteger(receiptQuantity) && !pendingWeight) {\n      issue('invalid_quantity', lineNumber, line, 'Item count exceeds the supported integer range.');\n    }\n    if (!Number.isFinite(receiptQuantity) || receiptQuantity <= 0) {\n      issue('invalid_quantity', lineNumber, line, 'Quantity must be a positive finite number.');\n    }\n    const calculatedTotal = Math.round(receiptQuantity * unitPriceMinor);\n    if (!Number.isSafeInteger(calculatedTotal) || Math.abs(calculatedTotal - lineTotal) > 1) {\n      issue('price_mismatch', lineNumber, line, 'Quantity multiplied by unit price differs from the printed total by more than one cent.');\n    }\n\n    const row = {\n      retailer_key: 'edeka',\n      receipt_input_index: inputIndex,\n      ...(input.json.source_key === undefined ? {} : { source_key: input.json.source_key }),\n      line_number: lineNumber,\n      raw_description: line,\n      product_name: name.trim(),\n      normalized_description: name.normalize('NFKC').trim().replace(/\\s+/g, ' ').toLowerCase(),\n      line_kind: isDeposit ? 'deposit' : 'product',\n      receipt_quantity: receiptQuantity,\n      receipt_unit: receiptUnit,\n      unit_price_minor: unitPriceMinor,\n      line_total_minor: lineTotal,\n      receipt_code: code,\n    };\n    pendingWeight = null;\n\n    if (isDeposit) {\n      adjustments.push(row);\n      previousProduct = null;\n    } else {\n      if (lineTotal < 0) {\n        issue('negative_product_total', lineNumber, line, 'Negative product lines need a return/cancellation rule, not a stock addition.');\n      }\n      row.discount_total_minor = 0;\n      row.net_line_total_minor = lineTotal;\n      products.push(row);\n      previousProduct = row;\n    }\n  }\n\n  discardPendingWeight('The item section ended before a product.');\n  if (!products.length && !adjustments.length) {\n    issue('no_recognized_items', 0, '', 'No products or adjustments were recognized.');\n  }\n  return result();\n});\n"
-      },
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        272,
-        64
-      ],
-      "id": "a6c8380a-e75d-4b0a-a136-c7af101ed3e4",
-      "name": "Parse EDEKA receipts",
-      "notesInFlow": true,
-      "notes": "Input: full extracted PDF text in json.text, one item per PDF. Output: one receipt with products, adjustments and parse_issues. No database or Grocy writes. Item counts and weight are not package-size conversions."
-    },
-    {
-      "parameters": {
-        "conditions": {
-          "options": {
-            "caseSensitive": true,
-            "leftValue": "",
-            "typeValidation": "strict",
-            "version": 4
-          },
-          "conditions": [
+        "url": "https://search.openfoodfacts.org/search",
+        "sendQuery": true,
+        "specifyQuery": "json",
+        "jsonQuery": "={\n  \"q\": \"{{ $json. }}\"\n}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
             {
-              "id": "5ff279ac-94b9-4f07-9161-269f31ddfdca",
-              "leftValue": "={{ $json.review_required }}",
-              "rightValue": "",
-              "operator": {
-                "type": "boolean",
-                "operation": "true",
-                "singleValue": true
-              }
+              "name": "user-agent",
+              "value": "N8N Workflow/0.1.0 (ggarcia24)"
             }
-          ],
-          "combinator": "and"
+          ]
         },
-        "options": {}
-      },
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2.4,
-      "position": [
-        512,
-        64
-      ],
-      "id": "fa8e2931-3dfe-444e-b749-9bd2c2d8e7d8",
-      "name": "Receipt needs review?"
-    },
-    {
-      "parameters": {},
-      "type": "n8n-nodes-base.noOp",
-      "typeVersion": 1,
-      "position": [
-        768,
-        -48
-      ],
-      "id": "ef8c99bf-18cf-438f-bd57-16f3d70bbd4f",
-      "name": "Review receipt - inspect parse_issues",
-      "notesInFlow": true,
-      "notes": "Review branch only: inspect parse_issues and the extracted text. This node does not notify anyone and must not be connected to automatic stock additions."
-    },
-    {
-      "parameters": {
-        "fieldToSplitOut": "products",
-        "options": {}
-      },
-      "type": "n8n-nodes-base.splitOut",
-      "typeVersion": 1.1,
-      "position": [
-        768,
-        208
-      ],
-      "id": "425bc10b-594f-4495-a490-4727ad9cc98a",
-      "name": "Split receipt products",
-      "notesInFlow": true,
-      "notes": "One product per output item, with product_name, normalized_description, receipt_quantity, receipt_unit and amounts in cents. Deposits/refunds/discounts remain in the parser receipt output. net_line_total_minor includes an immediately following App Preis / Rabatt discount. No conversion to Grocy stock units is performed here. receipt_input_index is not a persistent receipt/import identity."
-    },
-    {
-      "parameters": {
-        "jsCode": "function requiredString(value, field) {\n  if (typeof value !== 'string' || !value.trim()) {\n    throw new Error(`Mapping lookup requires a non-empty ${field}.`);\n  }\n  return value.trim();\n}\n\nfunction cents(value, field) {\n  if ((typeof value !== 'number' && typeof value !== 'string')\n      || !/^\\d+$/.test(String(value))\n      || !Number.isSafeInteger(Number(value))) {\n    throw new Error(`${field} must be a non-negative, safe integer amount in cents.`);\n  }\n  return String(Number(value));\n}\n\nreturn $input.all().map((input, index) => {\n  const row = input.json;\n  if (row.review_required === true || (Array.isArray(row.parse_issues) && row.parse_issues.length)) {\n    throw new Error(`Input ${index} has unresolved receipt parsing issues.`);\n  }\n  if (row.line_kind !== undefined && row.line_kind !== 'product') {\n    throw new Error(`Input ${index} is not a stock product; route deposits and discounts separately.`);\n  }\n\n  const name = requiredString(row.product_name ?? row.name ?? row.normalized_description, 'product_name');\n  const retailer = requiredString(row.retailer_key ?? 'edeka', 'retailer_key').toLowerCase();\n  const unit = requiredString(row.receipt_unit, 'receipt_unit').toLowerCase();\n  const quantity = String(row.receipt_quantity).replace(',', '.');\n  if (!/^\\d{1,12}(?:\\.\\d{1,6})?$/.test(quantity) || Number(quantity) <= 0) {\n    throw new Error(`Input ${index}: receipt_quantity must be positive with at most six decimal places.`);\n  }\n  const total = cents(row.line_total_minor, 'line_total_minor');\n  const netTotal = cents(row.net_line_total_minor ?? row.line_total_minor, 'net_line_total_minor');\n  if (Number(netTotal) > Number(total)) {\n    throw new Error(`Input ${index}: net_line_total_minor exceeds the printed product total.`);\n  }\n\n  return {\n    json: {\n      ...row,\n      product_name: name,\n      retailer_key: retailer,\n      normalized_description: name.normalize('NFKC').replace(/\\s+/g, ' ').trim().toLowerCase(),\n      receipt_quantity: quantity,\n      receipt_unit: unit,\n      line_total_minor: total,\n      net_line_total_minor: netTotal,\n    },\n    pairedItem: { item: index },\n  };\n});\n"
-      },
-      "name": "Prepare product lookup",
-      "id": "32b3ea6d-7c25-45f9-b5a2-7fe0a113a358",
-      "position": [
-        1696,
-        464
-      ],
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "notesInFlow": true,
-      "notes": "Connect your existing Split Out here. Required: product_name (or name), receipt_quantity, receipt_unit, line_total_minor (cents). Optional: retailer_key (fixed default edeka), net_line_total_minor. Does not guess missing quantities or weight units."
-    },
-    {
-      "parameters": {
-        "operation": "executeQuery",
-        "query": "WITH incoming AS (\n    SELECT $1::jsonb AS receipt_item\n)\nSELECT\n    i.receipt_item,\n    COALESCE((\n        SELECT jsonb_agg(\n            jsonb_build_object(\n                'product_id', p.id::text,\n                'alias_id', a.id::text,\n                'barcode', p.barcode,\n                'product_name', p.name,\n                'grocy_product_id', p.grocy_product_id::text,\n                'grocy_stock_unit_id', a.grocy_stock_unit_id::text,\n                'conversion_factor', a.stock_units_per_receipt_unit::text,\n                'stock_quantity', (\n                    (i.receipt_item->>'receipt_quantity')::numeric\n                    * a.stock_units_per_receipt_unit\n                )::text,\n                'price_per_stock_unit', (\n                    ((i.receipt_item->>'net_line_total_minor')::numeric / 100)\n                    / NULLIF(\n                        (i.receipt_item->>'receipt_quantity')::numeric\n                        * a.stock_units_per_receipt_unit,\n                        0\n                    )\n                )::text\n            )\n            ORDER BY a.id\n        )\n        FROM public.receipt_aliases AS a\n        JOIN public.products AS p ON p.id = a.product_id\n        WHERE a.retailer_key = i.receipt_item->>'retailer_key'\n          AND a.normalized_description = i.receipt_item->>'normalized_description'\n          AND a.receipt_unit = i.receipt_item->>'receipt_unit'\n          AND a.confirmed_at IS NOT NULL\n    ), '[]'::jsonb) AS mapping_candidates\nFROM incoming AS i;\n",
         "options": {
-          "queryBatching": "independently",
-          "queryReplacement": "={{ [JSON.stringify($json)] }}",
-          "largeNumbersOutput": "text"
-        }
-      },
-      "name": "Postgres - look up confirmed mapping",
-      "id": "034bca60-1600-4e08-a6d2-06a64431dfa4",
-      "position": [
-        1952,
-        464
-      ],
-      "type": "n8n-nodes-base.postgres",
-      "typeVersion": 2.7,
-      "notesInFlow": true,
-      "credentials": {
-        "postgres": {
-          "id": "CZZJJTuMXpb8aF5I",
-          "name": "Postgres account"
-        }
-      },
-      "notes": "READ ONLY. Uses public.products and public.receipt_aliases from the suggested schema. Always returns one row per input, including a cache miss. Values are bound as one JSONB parameter, not interpolated into SQL."
-    },
-    {
-      "parameters": {
-        "jsCode": "return $input.all().map((input, index) => {\n  const { receipt_item: receiptItem, mapping_candidates: candidates } = input.json;\n  if (!receiptItem || typeof receiptItem !== 'object' || Array.isArray(receiptItem)\n      || !Array.isArray(candidates)) {\n    throw new Error('Unexpected PostgreSQL lookup response; expected receipt_item and mapping_candidates.');\n  }\n\n  const output = {\n    ...receiptItem,\n    mapping_candidates: candidates,\n    mapping_candidate_count: candidates.length,\n    mapping_status: candidates.length === 0 ? 'missing' : 'ambiguous',\n    mapping_ready: false,\n    review_required: true,\n    mapping_reason: candidates.length === 0\n      ? 'No confirmed mapping. Connect this branch to product search and an AI helper.'\n      : 'Multiple confirmed mappings. Review the candidates instead of choosing the first.',\n  };\n\n  if (candidates.length === 1) {\n    const candidate = candidates[0];\n    const ids = ['product_id', 'alias_id', 'grocy_product_id', 'grocy_stock_unit_id'];\n    const positiveDecimals = ['conversion_factor', 'stock_quantity'];\n    const valid = candidate && typeof candidate === 'object'\n      && ids.every(field => /^[1-9]\\d*$/.test(candidate[field]))\n      && positiveDecimals.every(field =>\n        /^\\d+(?:\\.\\d+)?$/.test(candidate[field])\n        && Number.isFinite(Number(candidate[field]))\n        && Number(candidate[field]) > 0)\n      && /^\\d+(?:\\.\\d+)?$/.test(candidate.price_per_stock_unit)\n      && Number.isFinite(Number(candidate.price_per_stock_unit));\n\n    if (valid) {\n      Object.assign(output, {\n        product_id: candidate.product_id,\n        alias_id: candidate.alias_id,\n        barcode: candidate.barcode,\n        mapped_product_name: candidate.product_name,\n        grocy_product_id: candidate.grocy_product_id,\n        grocy_stock_unit_id: candidate.grocy_stock_unit_id,\n        conversion_factor: candidate.conversion_factor,\n        stock_quantity: candidate.stock_quantity,\n        price_per_stock_unit: candidate.price_per_stock_unit,\n        mapping_status: 'matched',\n        mapping_ready: true,\n        review_required: false,\n        mapping_reason: 'Exactly one confirmed mapping.',\n      });\n    } else {\n      output.mapping_status = 'invalid_mapping';\n      output.mapping_reason = 'The mapping contains invalid Grocy IDs, conversion factors or calculated amounts.';\n    }\n  }\n\n  return { json: output, pairedItem: { item: index } };\n});\n"
-      },
-      "name": "Resolve mapping result",
-      "id": "7a30b2c1-18c7-4389-ab10-d23de61d804c",
-      "position": [
-        2208,
-        464
-      ],
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "notesInFlow": true,
-      "notes": "Preserves the original product and adds mapping_candidates, mapping_status and mapping_ready. Amounts/conversions calculated with PostgreSQL NUMERIC remain decimal strings. Verify the expected stock unit against Grocy before any stock write."
-    },
-    {
-      "parameters": {
-        "conditions": {
-          "options": {
-            "caseSensitive": true,
-            "leftValue": "",
-            "typeValidation": "strict",
-            "version": 4
-          },
-          "conditions": [
-            {
-              "id": "430ac1ed-f5c2-40e6-b22e-4c0cddff9874",
-              "leftValue": "={{ $json.mapping_ready }}",
-              "rightValue": "",
-              "operator": {
-                "type": "boolean",
-                "operation": "true",
-                "singleValue": true
-              }
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 10000
             }
-          ],
-          "combinator": "and"
-        },
-        "options": {}
-      },
-      "name": "Confirmed mapping usable?",
-      "id": "bf683eee-f2c2-4e25-8da9-e06f078313ae",
-      "position": [
-        2464,
-        464
-      ],
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2.4
-    },
-    {
-      "parameters": {},
-      "name": "KNOWN - connect Grocy processing here",
-      "id": "165648ba-6393-448a-ab8d-e0ea8981467e",
-      "position": [
-        2800,
-        128
-      ],
-      "type": "n8n-nodes-base.noOp",
-      "typeVersion": 1,
-      "notesInFlow": true,
-      "notes": "Exactly one confirmed valid mapping. Outputs grocy_product_id, grocy_stock_unit_id, stock_quantity and price_per_stock_unit. This block does not add stock or record receipt imports; keep deduplication/import tracking before Grocy writes."
-    },
-    {
-      "parameters": {
-        "conditions": {
-          "options": {
-            "caseSensitive": true,
-            "leftValue": "",
-            "typeValidation": "strict",
-            "version": 4
           },
-          "conditions": [
-            {
-              "id": "9bb325a8-3667-42d0-9894-9916660899c8",
-              "leftValue": "={{ $json.mapping_status }}",
-              "rightValue": "missing",
-              "operator": {
-                "type": "string",
-                "operation": "equals"
-              }
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "responseFormat": "json"
             }
-          ],
-          "combinator": "and"
-        },
-        "options": {}
-      },
-      "name": "Mapping missing?",
-      "id": "a6e4816b-ce66-418a-9223-d34cd8cd57f0",
-      "position": [
-        2720,
-        608
-      ],
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2.4
-    },
-    {
-      "parameters": {},
-      "name": "MISSING - connect Open Food Facts and AI here",
-      "id": "e9c82f52-6835-4a21-9a52-514fee7cffee",
-      "position": [
-        3296,
-        448
-      ],
-      "type": "n8n-nodes-base.noOp",
-      "typeVersion": 1,
-      "notesInFlow": true,
-      "notes": "Connect product search, AI candidate matching, Grocy product selection and a trusted/manual approval step here. Preserve the receipt fields. AI should suggest a mapping, not set mapping_confirmed=true by itself."
-    },
-    {
-      "parameters": {},
-      "name": "REVIEW - ambiguous or invalid mapping",
-      "id": "e17d69d9-d59f-4752-9f5e-eb16eac5f48b",
-      "position": [
-        2944,
-        896
-      ],
-      "type": "n8n-nodes-base.noOp",
-      "typeVersion": 1,
-      "notesInFlow": true,
-      "notes": "Inspect mapping_candidates and mapping_reason. Do not select the first candidate automatically, and do not send this branch straight to Grocy."
-    },
-    {
-      "parameters": {
-        "jsCode": "function text(value, field) {\n  if (typeof value !== 'string' || !value.trim()) {\n    throw new Error(`Saving a mapping requires a non-empty ${field}.`);\n  }\n  return value.trim();\n}\n\nfunction id(value, field) {\n  const normalized = String(value);\n  if (!/^[1-9]\\d{0,18}$/.test(normalized)\n      || BigInt(normalized) > 9223372036854775807n\n      || (typeof value === 'number' && !Number.isSafeInteger(value))) {\n    throw new Error(`${field} must be a positive PostgreSQL BIGINT identifier.`);\n  }\n  return normalized;\n}\n\nfunction positiveDecimal(value, field) {\n  const normalized = String(value).replace(',', '.');\n  if (!/^\\d{1,12}(?:\\.\\d{1,6})?$/.test(normalized) || Number(normalized) <= 0) {\n    throw new Error(`${field} must be positive with at most six decimal places.`);\n  }\n  return normalized;\n}\n\nreturn $input.all().map((input, index) => {\n  const row = input.json;\n  if (row.mapping_confirmed !== true) {\n    throw new Error('Mapping not approved. Set mapping_confirmed=true only after a trusted/manual approval step.');\n  }\n  const approved = row.approved_mapping;\n  if (!approved || typeof approved !== 'object' || Array.isArray(approved)) {\n    throw new Error('Expected an approved_mapping object from the approval step.');\n  }\n  const productId = approved.product_id == null ? null : id(approved.product_id, 'product_id');\n  const barcode = approved.barcode == null ? null : text(approved.barcode, 'barcode');\n  if (productId === null && barcode === null) {\n    throw new Error('Supply an existing products.id or a barcode. Create barcode-free catalog products once before mapping them.');\n  }\n  if (barcode !== null && !/^\\d{8,14}$/.test(barcode)) {\n    throw new Error('barcode must be an 8-14 digit string; preserve leading zeroes.');\n  }\n  if (approved.barcode != null && typeof approved.barcode !== 'string') {\n    throw new Error('barcode must be a string, not a number.');\n  }\n\n  const packageQuantity = approved.package_quantity == null\n    ? null : positiveDecimal(approved.package_quantity, 'package_quantity');\n  const packageUnit = approved.package_unit == null ? null : text(approved.package_unit, 'package_unit');\n  if ((packageQuantity === null) !== (packageUnit === null)) {\n    throw new Error('Provide both package_quantity and package_unit, or neither.');\n  }\n  if (approved.metadata != null\n      && (typeof approved.metadata !== 'object' || Array.isArray(approved.metadata))) {\n    throw new Error('metadata must be a JSON object when provided.');\n  }\n\n  return {\n    json: {\n      ...row,\n      retailer_key: text(row.retailer_key, 'retailer_key').toLowerCase(),\n      normalized_description: text(row.normalized_description, 'normalized_description')\n        .normalize('NFKC').replace(/\\s+/g, ' ').toLowerCase(),\n      receipt_unit: text(row.receipt_unit, 'receipt_unit').toLowerCase(),\n      approved_mapping: {\n        product_id: productId,\n        barcode,\n        product_name: productId === null ? text(approved.product_name, 'product_name') : null,\n        grocy_product_id: id(approved.grocy_product_id, 'grocy_product_id'),\n        grocy_stock_unit_id: id(approved.grocy_stock_unit_id, 'grocy_stock_unit_id'),\n        stock_units_per_receipt_unit: positiveDecimal(\n          approved.stock_units_per_receipt_unit, 'stock_units_per_receipt_unit',\n        ),\n        package_quantity: packageQuantity,\n        package_unit: packageUnit,\n        metadata: approved.metadata ?? null,\n      },\n    },\n    pairedItem: { item: index },\n  };\n});\n"
-      },
-      "name": "SAVE ENTRY - validate approved mapping",
-      "id": "ede98f41-6701-440d-8bfc-d3c1d1c80d9d",
-      "position": [
-        1696,
-        1104
-      ],
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "notesInFlow": true,
-      "notes": "Separate entry: connect the output of a trusted/manual approval step here. Requires mapping_confirmed=true and approved_mapping with grocy_product_id, grocy_stock_unit_id, stock_units_per_receipt_unit, plus either an existing product_id or barcode + product_name. Barcode-free products must be created once in products, then referenced by product_id. This does not create products in Grocy."
-    },
-    {
-      "parameters": {
-        "operation": "executeQuery",
-        "query": "WITH incoming AS (\n    SELECT $1::jsonb AS receipt_item\n),\nexisting_product AS (\n    SELECT p.id, p.name, p.barcode, p.grocy_product_id\n    FROM public.products AS p\n    CROSS JOIN incoming AS i\n    WHERE p.id = (i.receipt_item->'approved_mapping'->>'product_id')::bigint\n      AND p.grocy_product_id =\n          (i.receipt_item->'approved_mapping'->>'grocy_product_id')::bigint\n      AND (\n          i.receipt_item->'approved_mapping'->>'barcode' IS NULL\n          OR p.barcode = i.receipt_item->'approved_mapping'->>'barcode'\n      )\n),\nnew_product AS (\n    INSERT INTO public.products AS stored (\n        barcode, name, package_quantity, package_unit, grocy_product_id, metadata\n    )\n    SELECT\n        i.receipt_item->'approved_mapping'->>'barcode',\n        i.receipt_item->'approved_mapping'->>'product_name',\n        (i.receipt_item->'approved_mapping'->>'package_quantity')::numeric,\n        i.receipt_item->'approved_mapping'->>'package_unit',\n        (i.receipt_item->'approved_mapping'->>'grocy_product_id')::bigint,\n        NULLIF(i.receipt_item->'approved_mapping'->'metadata', 'null'::jsonb)\n    FROM incoming AS i\n    WHERE i.receipt_item->'approved_mapping'->>'product_id' IS NULL\n    ON CONFLICT (barcode) DO UPDATE\n        SET barcode = EXCLUDED.barcode\n        WHERE stored.grocy_product_id = EXCLUDED.grocy_product_id\n    RETURNING id, name, barcode, grocy_product_id\n),\nchosen_product AS (\n    SELECT id, name, barcode, grocy_product_id FROM existing_product\n    UNION ALL\n    SELECT id, name, barcode, grocy_product_id FROM new_product\n),\nsaved_alias AS (\n    INSERT INTO public.receipt_aliases (\n        retailer_key, normalized_description, product_id, receipt_unit,\n        grocy_stock_unit_id, stock_units_per_receipt_unit, confirmed_at\n    )\n    SELECT\n        i.receipt_item->>'retailer_key',\n        i.receipt_item->>'normalized_description',\n        p.id,\n        i.receipt_item->>'receipt_unit',\n        (i.receipt_item->'approved_mapping'->>'grocy_stock_unit_id')::bigint,\n        (i.receipt_item->'approved_mapping'->>'stock_units_per_receipt_unit')::numeric,\n        CURRENT_TIMESTAMP\n    FROM incoming AS i\n    CROSS JOIN chosen_product AS p\n    WHERE TRUE\n    ON CONFLICT (retailer_key, normalized_description, receipt_unit, product_id)\n    DO UPDATE SET\n        grocy_stock_unit_id = EXCLUDED.grocy_stock_unit_id,\n        stock_units_per_receipt_unit = EXCLUDED.stock_units_per_receipt_unit,\n        confirmed_at = EXCLUDED.confirmed_at\n    RETURNING id, product_id, grocy_stock_unit_id, stock_units_per_receipt_unit\n)\nSELECT\n    i.receipt_item,\n    (\n        SELECT jsonb_build_object(\n            'product_id', p.id::text,\n            'alias_id', a.id::text,\n            'barcode', p.barcode,\n            'product_name', p.name,\n            'grocy_product_id', p.grocy_product_id::text,\n            'grocy_stock_unit_id', a.grocy_stock_unit_id::text,\n            'conversion_factor', a.stock_units_per_receipt_unit::text\n        )\n        FROM saved_alias AS a\n        JOIN chosen_product AS p ON p.id = a.product_id\n    ) AS saved_mapping\nFROM incoming AS i;\n",
-        "options": {
-          "queryBatching": "independently",
-          "queryReplacement": "={{ [JSON.stringify($json)] }}",
-          "largeNumbersOutput": "text"
+          }
         }
       },
-      "name": "Postgres - save confirmed mapping",
-      "id": "aa0fbd80-ae2d-4962-be3b-0211887c1679",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
       "position": [
-        1952,
-        1104
+        800,
+        -240
       ],
-      "type": "n8n-nodes-base.postgres",
-      "typeVersion": 2.7,
-      "notesInFlow": true,
-      "credentials": {
-        "postgres": {
-          "id": "CZZJJTuMXpb8aF5I",
-          "name": "Postgres account"
-        }
-      },
-      "notes": "WRITES only public.products/receipt_aliases in one atomic SQL statement. Repeated saves reuse the product/alias. Never reassigns an existing barcode to a different Grocy product. Does not delete alternative aliases; ambiguous labels remain review-only."
-    },
-    {
-      "parameters": {
-        "jsCode": "return $input.all().map((input, index) => {\n  const { receipt_item: receiptItem, saved_mapping: savedMapping } = input.json;\n  if (!receiptItem || !savedMapping) {\n    throw new Error('Mapping was not saved: the selected product does not exist or its barcode/product ID is already mapped to a different Grocy product.');\n  }\n  return {\n    json: {\n      ...receiptItem,\n      cache_saved: true,\n      saved_mapping: savedMapping,\n    },\n    pairedItem: { item: index },\n  };\n});\n"
-      },
-      "name": "Verify saved mapping",
-      "id": "25ba7ee1-f3c8-4ae3-8c39-2bd6d2c1d3c6",
-      "position": [
-        2208,
-        1104
-      ],
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "notesInFlow": true,
-      "notes": "Fails explicitly on a conflicting/nonexistent product. On success, runs the normal lookup again; only a uniquely resolved mapping reaches the KNOWN branch."
+      "id": "a3d2539e-82c9-4c59-9d4e-a36b9618ec86",
+      "name": "HTTP Request1"
     }
   ],
   "pinData": {
     "When clicking ‘Execute workflow’": [
+      {
+        "json": {
+          "id": "1a183cfe292d13e9",
+          "threadId": "1a183cfe292d13e9",
+          "snippet": "Horrifying things come in 3s! Humble Bundle Save big on a curated collection of horror games that celebrate the season by delivering exceptional scares! Take on FEAR 1-3, where you play as a First",
+          "payload": {
+            "mimeType": "text/html"
+          },
+          "sizeEstimate": 35426,
+          "historyId": "29088688",
+          "internalDate": "1793212800000",
+          "labels": [
+            {
+              "id": "INBOX",
+              "name": "INBOX"
+            },
+            {
+              "id": "CATEGORY_PROMOTIONS",
+              "name": "CATEGORY_PROMOTIONS"
+            },
+            {
+              "id": "UNREAD",
+              "name": "UNREAD"
+            }
+          ],
+          "Subject": "Play the F.E.A.R. series and more with the Horror Trifectas Bundle!",
+          "From": "Humble Bundle <contact@mailer.humblebundle.com>",
+          "To": "gonzalogarcia243@gmail.com"
+        }
+      },
+      {
+        "json": {
+          "id": "1a183ca4b92d90e9",
+          "threadId": "1a183ca4b92d90e9",
+          "snippet": "Dein PAYBACK Service ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌",
+          "payload": {
+            "mimeType": "multipart/alternative"
+          },
+          "sizeEstimate": 107558,
+          "historyId": "29088583",
+          "internalDate": "1793212434000",
+          "labels": [
+            {
+              "id": "INBOX",
+              "name": "INBOX"
+            },
+            {
+              "id": "IMPORTANT",
+              "name": "IMPORTANT"
+            },
+            {
+              "id": "CATEGORY_UPDATES",
+              "name": "CATEGORY_UPDATES"
+            },
+            {
+              "id": "UNREAD",
+              "name": "UNREAD"
+            }
+          ],
+          "To": "gonzalogarcia243@gmail.com",
+          "From": "PAYBACK Service <service@payback.de>",
+          "Subject": "2 Joker-Coupons als Dankeschön für deinen EDEKA-Einkauf!"
+        }
+      },
       {
         "json": {
           "id": "1a183c97e549e71b",
@@ -1103,62 +719,6 @@
           "To": "gonzalogarcia243@gmail.com",
           "From": "EDEKA <noreply@app.edeka.de>"
         }
-      },
-      {
-        "json": {
-          "id": "1a1a294376db303b",
-          "threadId": "1a1a294376db303b",
-          "snippet": "Hallo Gonzalo Garcia, vielen Dank für deinen Einkauf mit der EDEKA App! Einen digitalen Kassenzettel für diesen Einkauf findest du als PDF-Anhang in dieser E-Mail*. In der EDEKA App kannst du alle",
-          "payload": {
-            "mimeType": "multipart/mixed"
-          },
-          "sizeEstimate": 25160,
-          "historyId": "29140958",
-          "internalDate": "1793728977000",
-          "labels": [
-            {
-              "id": "INBOX",
-              "name": "INBOX"
-            },
-            {
-              "id": "CATEGORY_UPDATES",
-              "name": "CATEGORY_UPDATES"
-            },
-            {
-              "id": "UNREAD",
-              "name": "UNREAD"
-            }
-          ],
-          "Subject": "EDEKA - Vielen Dank für Ihren Einkauf",
-          "To": "gonzalogarcia243@gmail.com",
-          "From": "EDEKA <noreply@app.edeka.de>"
-        }
-      },
-      {
-        "json": {
-          "id": "1a1967c90ddf5ea7",
-          "threadId": "1a1967c90ddf5ea7",
-          "snippet": "Sent from my iPhone Begin forwarded message: From: EDEKA &lt;noreply@app.edeka.de&gt; Date: 30. October 2026 at 16:58:23 CET To: ariel-azi@hotmail.com Subject: EDEKA - Vielen Dank für Ihren Einkauf",
-          "payload": {
-            "mimeType": "multipart/mixed"
-          },
-          "sizeEstimate": 37020,
-          "historyId": "29121979",
-          "internalDate": "1793526106000",
-          "labels": [
-            {
-              "id": "INBOX",
-              "name": "INBOX"
-            },
-            {
-              "id": "CATEGORY_PERSONAL",
-              "name": "CATEGORY_PERSONAL"
-            }
-          ],
-          "From": "Ariel Aziernicki <ariel-azi@hotmail.com>",
-          "To": "\"gonzalogarcia243@gmail.com\" <gonzalogarcia243@gmail.com>",
-          "Subject": "Fwd: EDEKA - Vielen Dank für Ihren Einkauf"
-        }
       }
     ]
   },
@@ -1185,17 +745,18 @@
   "staticData": {
     "node:Gmail Trigger": {
       "Gmail Trigger": {
-        "lastTimeChecked": 1793950090,
+        "lastTimeChecked": 1794008730,
         "pendingMessageIds": [],
         "noProgressTicks": 0,
         "possibleDuplicates": [
-          "1a1afc206dacf371"
+          "1a1b340d72bc85fe",
+          "1a1b3f9daeafd439"
         ]
       }
     }
   },
   "tags": [],
   "triggerCount": 1,
-  "updatedAt": "2026-11-05T00:47:19.450Z",
-  "versionId": "a421513a-2e14-4ff2-823d-80d3716763c8"
+  "updatedAt": "2026-11-06T17:58:17.539Z",
+  "versionId": "048e07ae-3a02-4b23-8c57-86b6fb56251a"
 }
