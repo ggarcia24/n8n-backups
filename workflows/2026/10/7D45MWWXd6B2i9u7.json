@@ -374,6 +374,113 @@
             "node": "HTTP Request1",
             "type": "main",
             "index": 0
+          },
+          {
+            "node": "Prepare product lookup",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare product lookup": {
+      "main": [
+        [
+          {
+            "node": "Postgres - look up confirmed mapping",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Postgres - look up confirmed mapping": {
+      "main": [
+        [
+          {
+            "node": "Resolve mapping result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Resolve mapping result": {
+      "main": [
+        [
+          {
+            "node": "Confirmed mapping usable?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Confirmed mapping usable?": {
+      "main": [
+        [
+          {
+            "node": "KNOWN - connect Grocy processing here",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Mapping missing?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mapping missing?": {
+      "main": [
+        [
+          {
+            "node": "MISSING - connect Open Food Facts and AI here",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "REVIEW - ambiguous or invalid mapping",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SAVE ENTRY - validate approved mapping": {
+      "main": [
+        [
+          {
+            "node": "Postgres - save confirmed mapping",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Postgres - save confirmed mapping": {
+      "main": [
+        [
+          {
+            "node": "Verify saved mapping",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify saved mapping": {
+      "main": [
+        [
+          {
+            "node": "Prepare product lookup",
+            "type": "main",
+            "index": 0
           }
         ]
       ]
@@ -385,7 +492,7 @@
   "meta": {
     "templateCredsSetupCompleted": true
   },
-  "name": "Notify Me of Edeka Purchases",
+  "name": "EDEKA PostgreSQL mapping cache blocks",
   "nodeGroups": [],
   "nodes": [
     {
@@ -545,7 +652,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const regex = /^(?<name>[^0-9]+)((?<unit_price>[0-9\\,]+)\\s€\\sx\\s(?<quantity>[0-9]))?\\s(?<total>[0-9\\,]+)\\s(?<kind>AW|B|A)/;\nconst ticketText = $input.first().json.text;\n\nconst start = ticketText.indexOf(\"EUR\");\nconst end = ticketText.indexOf(\"Posten:\");\n\nconst rawText = ticketText.slice(start+3, end).trim();\n\nconst products = [];\n\nfor (const line of rawText.split(\"\\n\")) {\n  const matches = line.match(regex);\n  if (matches) {\n    let {name, unit_price, quantity, total, kind} = matches.groups;\n    if (!unit_price) {\n      unit_price = total\n      quantity = 1\n    }\n    const product = {\n      name,\n      unit_price,\n      quantity,\n      total,\n      kind,\n    }\n    products.push(product)\n  }\n}\nreturn {\n  rawText,\n  products,\n}\n"
+        "jsCode": "let originalText = [];\nconst products = [];\nconst regex = /^(?<name>[^0-9]+)((?<unit_price>[0-9\\,]+)\\s€\\sx\\s(?<quantity>[0-9]))?\\s(?<total>[0-9\\,]+)\\s(?<kind>AW|B|A)/;\n\nfor (const purchaseTicket of $input.all()) {\n  const ticketText = purchaseTicket.json.text;\n\n  const start = ticketText.indexOf(\"EUR\");\n  const end = ticketText.indexOf(\"Posten:\");\n  \n  const rawText = ticketText.slice(start+3, end).trim();\n  originalText.push(rawText)\n  \n  \n  for (const line of rawText.split(\"\\n\")) {\n    const matches = line.match(regex);\n    if (matches) {\n      let {name, unit_price, quantity, total, kind} = matches.groups;\n      if (!unit_price) {\n        unit_price = total\n        quantity = 1\n      }\n      const product = {\n        name,\n        unit_price,\n        quantity,\n        total,\n        kind,\n      }\n      products.push(product)\n    }\n  }\n}\n\nreturn {\n  originalText,\n  products,\n}\n"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -617,79 +724,235 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.5,
       "position": [
-        800,
-        -240
+        880,
+        -384
       ],
       "id": "a3d2539e-82c9-4c59-9d4e-a36b9618ec86",
       "name": "HTTP Request1"
+    },
+    {
+      "parameters": {
+        "jsCode": "function requiredString(value, field) {\n  if (typeof value !== 'string' || !value.trim()) {\n    throw new Error(`Mapping lookup requires a non-empty ${field}.`);\n  }\n  return value.trim();\n}\n\nfunction cents(value, field) {\n  if ((typeof value !== 'number' && typeof value !== 'string')\n      || !/^\\d+$/.test(String(value))\n      || !Number.isSafeInteger(Number(value))) {\n    throw new Error(`${field} must be a non-negative, safe integer amount in cents.`);\n  }\n  return String(Number(value));\n}\n\nreturn $input.all().map((input, index) => {\n  const row = input.json;\n  if (row.review_required === true || (Array.isArray(row.parse_issues) && row.parse_issues.length)) {\n    throw new Error(`Input ${index} has unresolved receipt parsing issues.`);\n  }\n  if (row.line_kind !== undefined && row.line_kind !== 'product') {\n    throw new Error(`Input ${index} is not a stock product; route deposits and discounts separately.`);\n  }\n\n  const name = requiredString(row.product_name ?? row.name ?? row.normalized_description, 'product_name');\n  const retailer = requiredString(row.retailer_key ?? 'edeka', 'retailer_key').toLowerCase();\n  const unit = requiredString(row.receipt_unit, 'receipt_unit').toLowerCase();\n  const quantity = String(row.receipt_quantity).replace(',', '.');\n  if (!/^\\d{1,12}(?:\\.\\d{1,6})?$/.test(quantity) || Number(quantity) <= 0) {\n    throw new Error(`Input ${index}: receipt_quantity must be positive with at most six decimal places.`);\n  }\n  const total = cents(row.line_total_minor, 'line_total_minor');\n  const netTotal = cents(row.net_line_total_minor ?? row.line_total_minor, 'net_line_total_minor');\n  if (Number(netTotal) > Number(total)) {\n    throw new Error(`Input ${index}: net_line_total_minor exceeds the printed product total.`);\n  }\n\n  return {\n    json: {\n      ...row,\n      product_name: name,\n      retailer_key: retailer,\n      normalized_description: name.normalize('NFKC').replace(/\\s+/g, ' ').trim().toLowerCase(),\n      receipt_quantity: quantity,\n      receipt_unit: unit,\n      line_total_minor: total,\n      net_line_total_minor: netTotal,\n    },\n    pairedItem: { item: index },\n  };\n});\n"
+      },
+      "name": "Prepare product lookup",
+      "id": "33d6b27d-41e5-4097-a0c9-db0fc6c82814",
+      "position": [
+        1264,
+        208
+      ],
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "notesInFlow": true,
+      "notes": "Connect your existing Split Out here. Required: product_name (or name), receipt_quantity, receipt_unit, line_total_minor (cents). Optional: retailer_key (fixed default edeka), net_line_total_minor. Does not guess missing quantities or weight units."
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH incoming AS (\n    SELECT $1::jsonb AS receipt_item\n)\nSELECT\n    i.receipt_item,\n    COALESCE((\n        SELECT jsonb_agg(\n            jsonb_build_object(\n                'product_id', p.id::text,\n                'alias_id', a.id::text,\n                'barcode', p.barcode,\n                'product_name', p.name,\n                'grocy_product_id', p.grocy_product_id::text,\n                'grocy_stock_unit_id', a.grocy_stock_unit_id::text,\n                'conversion_factor', a.stock_units_per_receipt_unit::text,\n                'stock_quantity', (\n                    (i.receipt_item->>'receipt_quantity')::numeric\n                    * a.stock_units_per_receipt_unit\n                )::text,\n                'price_per_stock_unit', (\n                    ((i.receipt_item->>'net_line_total_minor')::numeric / 100)\n                    / NULLIF(\n                        (i.receipt_item->>'receipt_quantity')::numeric\n                        * a.stock_units_per_receipt_unit,\n                        0\n                    )\n                )::text\n            )\n            ORDER BY a.id\n        )\n        FROM public.receipt_aliases AS a\n        JOIN public.products AS p ON p.id = a.product_id\n        WHERE a.retailer_key = i.receipt_item->>'retailer_key'\n          AND a.normalized_description = i.receipt_item->>'normalized_description'\n          AND a.receipt_unit = i.receipt_item->>'receipt_unit'\n          AND a.confirmed_at IS NOT NULL\n    ), '[]'::jsonb) AS mapping_candidates\nFROM incoming AS i;\n",
+        "options": {
+          "queryBatching": "independently",
+          "queryReplacement": "={{ [JSON.stringify($json)] }}",
+          "largeNumbersOutput": "text"
+        }
+      },
+      "name": "Postgres - look up confirmed mapping",
+      "id": "ce39afd1-171c-4233-9216-f5bba54025ab",
+      "position": [
+        1520,
+        208
+      ],
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "notesInFlow": true,
+      "credentials": {
+        "postgres": {
+          "id": "CZZJJTuMXpb8aF5I",
+          "name": "Postgres account"
+        }
+      },
+      "notes": "READ ONLY. Uses public.products and public.receipt_aliases from the suggested schema. Always returns one row per input, including a cache miss. Values are bound as one JSONB parameter, not interpolated into SQL."
+    },
+    {
+      "parameters": {
+        "jsCode": "return $input.all().map((input, index) => {\n  const { receipt_item: receiptItem, mapping_candidates: candidates } = input.json;\n  if (!receiptItem || typeof receiptItem !== 'object' || Array.isArray(receiptItem)\n      || !Array.isArray(candidates)) {\n    throw new Error('Unexpected PostgreSQL lookup response; expected receipt_item and mapping_candidates.');\n  }\n\n  const output = {\n    ...receiptItem,\n    mapping_candidates: candidates,\n    mapping_candidate_count: candidates.length,\n    mapping_status: candidates.length === 0 ? 'missing' : 'ambiguous',\n    mapping_ready: false,\n    review_required: true,\n    mapping_reason: candidates.length === 0\n      ? 'No confirmed mapping. Connect this branch to product search and an AI helper.'\n      : 'Multiple confirmed mappings. Review the candidates instead of choosing the first.',\n  };\n\n  if (candidates.length === 1) {\n    const candidate = candidates[0];\n    const ids = ['product_id', 'alias_id', 'grocy_product_id', 'grocy_stock_unit_id'];\n    const positiveDecimals = ['conversion_factor', 'stock_quantity'];\n    const valid = candidate && typeof candidate === 'object'\n      && ids.every(field => /^[1-9]\\d*$/.test(candidate[field]))\n      && positiveDecimals.every(field =>\n        /^\\d+(?:\\.\\d+)?$/.test(candidate[field])\n        && Number.isFinite(Number(candidate[field]))\n        && Number(candidate[field]) > 0)\n      && /^\\d+(?:\\.\\d+)?$/.test(candidate.price_per_stock_unit)\n      && Number.isFinite(Number(candidate.price_per_stock_unit));\n\n    if (valid) {\n      Object.assign(output, {\n        product_id: candidate.product_id,\n        alias_id: candidate.alias_id,\n        barcode: candidate.barcode,\n        mapped_product_name: candidate.product_name,\n        grocy_product_id: candidate.grocy_product_id,\n        grocy_stock_unit_id: candidate.grocy_stock_unit_id,\n        conversion_factor: candidate.conversion_factor,\n        stock_quantity: candidate.stock_quantity,\n        price_per_stock_unit: candidate.price_per_stock_unit,\n        mapping_status: 'matched',\n        mapping_ready: true,\n        review_required: false,\n        mapping_reason: 'Exactly one confirmed mapping.',\n      });\n    } else {\n      output.mapping_status = 'invalid_mapping';\n      output.mapping_reason = 'The mapping contains invalid Grocy IDs, conversion factors or calculated amounts.';\n    }\n  }\n\n  return { json: output, pairedItem: { item: index } };\n});\n"
+      },
+      "name": "Resolve mapping result",
+      "id": "5d41bd6d-c52f-4c7e-9467-2067b80a057e",
+      "position": [
+        1776,
+        208
+      ],
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "notesInFlow": true,
+      "notes": "Preserves the original product and adds mapping_candidates, mapping_status and mapping_ready. Amounts/conversions calculated with PostgreSQL NUMERIC remain decimal strings. Verify the expected stock unit against Grocy before any stock write."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 4
+          },
+          "conditions": [
+            {
+              "id": "430ac1ed-f5c2-40e6-b22e-4c0cddff9874",
+              "leftValue": "={{ $json.mapping_ready }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "name": "Confirmed mapping usable?",
+      "id": "72707e27-fc6d-437b-ae80-6594866c0e1b",
+      "position": [
+        2032,
+        208
+      ],
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.4
+    },
+    {
+      "parameters": {},
+      "name": "KNOWN - connect Grocy processing here",
+      "id": "f159aee6-f24e-4570-8311-630c1e2e4185",
+      "position": [
+        2288,
+        64
+      ],
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "notesInFlow": true,
+      "notes": "Exactly one confirmed valid mapping. Outputs grocy_product_id, grocy_stock_unit_id, stock_quantity and price_per_stock_unit. This block does not add stock or record receipt imports; keep deduplication/import tracking before Grocy writes."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 4
+          },
+          "conditions": [
+            {
+              "id": "9bb325a8-3667-42d0-9894-9916660899c8",
+              "leftValue": "={{ $json.mapping_status }}",
+              "rightValue": "missing",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "name": "Mapping missing?",
+      "id": "2982c490-78b9-4472-8280-070ef3dece86",
+      "position": [
+        2288,
+        352
+      ],
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.4
+    },
+    {
+      "parameters": {},
+      "name": "MISSING - connect Open Food Facts and AI here",
+      "id": "0364217c-2803-46da-9c25-55108c5400cf",
+      "position": [
+        2544,
+        288
+      ],
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "notesInFlow": true,
+      "notes": "Connect product search, AI candidate matching, Grocy product selection and a trusted/manual approval step here. Preserve the receipt fields. AI should suggest a mapping, not set mapping_confirmed=true by itself."
+    },
+    {
+      "parameters": {},
+      "name": "REVIEW - ambiguous or invalid mapping",
+      "id": "b3097e7a-cd67-4c92-add1-84dd9414c401",
+      "position": [
+        2544,
+        512
+      ],
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "notesInFlow": true,
+      "notes": "Inspect mapping_candidates and mapping_reason. Do not select the first candidate automatically, and do not send this branch straight to Grocy."
+    },
+    {
+      "parameters": {
+        "jsCode": "function text(value, field) {\n  if (typeof value !== 'string' || !value.trim()) {\n    throw new Error(`Saving a mapping requires a non-empty ${field}.`);\n  }\n  return value.trim();\n}\n\nfunction id(value, field) {\n  const normalized = String(value);\n  if (!/^[1-9]\\d{0,18}$/.test(normalized)\n      || BigInt(normalized) > 9223372036854775807n\n      || (typeof value === 'number' && !Number.isSafeInteger(value))) {\n    throw new Error(`${field} must be a positive PostgreSQL BIGINT identifier.`);\n  }\n  return normalized;\n}\n\nfunction positiveDecimal(value, field) {\n  const normalized = String(value).replace(',', '.');\n  if (!/^\\d{1,12}(?:\\.\\d{1,6})?$/.test(normalized) || Number(normalized) <= 0) {\n    throw new Error(`${field} must be positive with at most six decimal places.`);\n  }\n  return normalized;\n}\n\nreturn $input.all().map((input, index) => {\n  const row = input.json;\n  if (row.mapping_confirmed !== true) {\n    throw new Error('Mapping not approved. Set mapping_confirmed=true only after a trusted/manual approval step.');\n  }\n  const approved = row.approved_mapping;\n  if (!approved || typeof approved !== 'object' || Array.isArray(approved)) {\n    throw new Error('Expected an approved_mapping object from the approval step.');\n  }\n  const productId = approved.product_id == null ? null : id(approved.product_id, 'product_id');\n  const barcode = approved.barcode == null ? null : text(approved.barcode, 'barcode');\n  if (productId === null && barcode === null) {\n    throw new Error('Supply an existing products.id or a barcode. Create barcode-free catalog products once before mapping them.');\n  }\n  if (barcode !== null && !/^\\d{8,14}$/.test(barcode)) {\n    throw new Error('barcode must be an 8-14 digit string; preserve leading zeroes.');\n  }\n  if (approved.barcode != null && typeof approved.barcode !== 'string') {\n    throw new Error('barcode must be a string, not a number.');\n  }\n\n  const packageQuantity = approved.package_quantity == null\n    ? null : positiveDecimal(approved.package_quantity, 'package_quantity');\n  const packageUnit = approved.package_unit == null ? null : text(approved.package_unit, 'package_unit');\n  if ((packageQuantity === null) !== (packageUnit === null)) {\n    throw new Error('Provide both package_quantity and package_unit, or neither.');\n  }\n  if (approved.metadata != null\n      && (typeof approved.metadata !== 'object' || Array.isArray(approved.metadata))) {\n    throw new Error('metadata must be a JSON object when provided.');\n  }\n\n  return {\n    json: {\n      ...row,\n      retailer_key: text(row.retailer_key, 'retailer_key').toLowerCase(),\n      normalized_description: text(row.normalized_description, 'normalized_description')\n        .normalize('NFKC').replace(/\\s+/g, ' ').toLowerCase(),\n      receipt_unit: text(row.receipt_unit, 'receipt_unit').toLowerCase(),\n      approved_mapping: {\n        product_id: productId,\n        barcode,\n        product_name: productId === null ? text(approved.product_name, 'product_name') : null,\n        grocy_product_id: id(approved.grocy_product_id, 'grocy_product_id'),\n        grocy_stock_unit_id: id(approved.grocy_stock_unit_id, 'grocy_stock_unit_id'),\n        stock_units_per_receipt_unit: positiveDecimal(\n          approved.stock_units_per_receipt_unit, 'stock_units_per_receipt_unit',\n        ),\n        package_quantity: packageQuantity,\n        package_unit: packageUnit,\n        metadata: approved.metadata ?? null,\n      },\n    },\n    pairedItem: { item: index },\n  };\n});\n"
+      },
+      "name": "SAVE ENTRY - validate approved mapping",
+      "id": "e57a0631-5781-4e67-bb1b-0ae8ce22e82f",
+      "position": [
+        1264,
+        848
+      ],
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "notesInFlow": true,
+      "notes": "Separate entry: connect the output of a trusted/manual approval step here. Requires mapping_confirmed=true and approved_mapping with grocy_product_id, grocy_stock_unit_id, stock_units_per_receipt_unit, plus either an existing product_id or barcode + product_name. Barcode-free products must be created once in products, then referenced by product_id. This does not create products in Grocy."
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH incoming AS (\n    SELECT $1::jsonb AS receipt_item\n),\nexisting_product AS (\n    SELECT p.id, p.name, p.barcode, p.grocy_product_id\n    FROM public.products AS p\n    CROSS JOIN incoming AS i\n    WHERE p.id = (i.receipt_item->'approved_mapping'->>'product_id')::bigint\n      AND p.grocy_product_id =\n          (i.receipt_item->'approved_mapping'->>'grocy_product_id')::bigint\n      AND (\n          i.receipt_item->'approved_mapping'->>'barcode' IS NULL\n          OR p.barcode = i.receipt_item->'approved_mapping'->>'barcode'\n      )\n),\nnew_product AS (\n    INSERT INTO public.products AS stored (\n        barcode, name, package_quantity, package_unit, grocy_product_id, metadata\n    )\n    SELECT\n        i.receipt_item->'approved_mapping'->>'barcode',\n        i.receipt_item->'approved_mapping'->>'product_name',\n        (i.receipt_item->'approved_mapping'->>'package_quantity')::numeric,\n        i.receipt_item->'approved_mapping'->>'package_unit',\n        (i.receipt_item->'approved_mapping'->>'grocy_product_id')::bigint,\n        NULLIF(i.receipt_item->'approved_mapping'->'metadata', 'null'::jsonb)\n    FROM incoming AS i\n    WHERE i.receipt_item->'approved_mapping'->>'product_id' IS NULL\n    ON CONFLICT (barcode) DO UPDATE\n        SET barcode = EXCLUDED.barcode\n        WHERE stored.grocy_product_id = EXCLUDED.grocy_product_id\n    RETURNING id, name, barcode, grocy_product_id\n),\nchosen_product AS (\n    SELECT id, name, barcode, grocy_product_id FROM existing_product\n    UNION ALL\n    SELECT id, name, barcode, grocy_product_id FROM new_product\n),\nsaved_alias AS (\n    INSERT INTO public.receipt_aliases (\n        retailer_key, normalized_description, product_id, receipt_unit,\n        grocy_stock_unit_id, stock_units_per_receipt_unit, confirmed_at\n    )\n    SELECT\n        i.receipt_item->>'retailer_key',\n        i.receipt_item->>'normalized_description',\n        p.id,\n        i.receipt_item->>'receipt_unit',\n        (i.receipt_item->'approved_mapping'->>'grocy_stock_unit_id')::bigint,\n        (i.receipt_item->'approved_mapping'->>'stock_units_per_receipt_unit')::numeric,\n        CURRENT_TIMESTAMP\n    FROM incoming AS i\n    CROSS JOIN chosen_product AS p\n    WHERE TRUE\n    ON CONFLICT (retailer_key, normalized_description, receipt_unit, product_id)\n    DO UPDATE SET\n        grocy_stock_unit_id = EXCLUDED.grocy_stock_unit_id,\n        stock_units_per_receipt_unit = EXCLUDED.stock_units_per_receipt_unit,\n        confirmed_at = EXCLUDED.confirmed_at\n    RETURNING id, product_id, grocy_stock_unit_id, stock_units_per_receipt_unit\n)\nSELECT\n    i.receipt_item,\n    (\n        SELECT jsonb_build_object(\n            'product_id', p.id::text,\n            'alias_id', a.id::text,\n            'barcode', p.barcode,\n            'product_name', p.name,\n            'grocy_product_id', p.grocy_product_id::text,\n            'grocy_stock_unit_id', a.grocy_stock_unit_id::text,\n            'conversion_factor', a.stock_units_per_receipt_unit::text\n        )\n        FROM saved_alias AS a\n        JOIN chosen_product AS p ON p.id = a.product_id\n    ) AS saved_mapping\nFROM incoming AS i;\n",
+        "options": {
+          "queryBatching": "independently",
+          "queryReplacement": "={{ [JSON.stringify($json)] }}",
+          "largeNumbersOutput": "text"
+        }
+      },
+      "name": "Postgres - save confirmed mapping",
+      "id": "223a8f7e-6560-4f3e-afd1-148dbf0673eb",
+      "position": [
+        1520,
+        848
+      ],
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "notesInFlow": true,
+      "credentials": {
+        "postgres": {
+          "id": "CZZJJTuMXpb8aF5I",
+          "name": "Postgres account"
+        }
+      },
+      "notes": "WRITES only public.products/receipt_aliases in one atomic SQL statement. Repeated saves reuse the product/alias. Never reassigns an existing barcode to a different Grocy product. Does not delete alternative aliases; ambiguous labels remain review-only."
+    },
+    {
+      "parameters": {
+        "jsCode": "return $input.all().map((input, index) => {\n  const { receipt_item: receiptItem, saved_mapping: savedMapping } = input.json;\n  if (!receiptItem || !savedMapping) {\n    throw new Error('Mapping was not saved: the selected product does not exist or its barcode/product ID is already mapped to a different Grocy product.');\n  }\n  return {\n    json: {\n      ...receiptItem,\n      cache_saved: true,\n      saved_mapping: savedMapping,\n    },\n    pairedItem: { item: index },\n  };\n});\n"
+      },
+      "name": "Verify saved mapping",
+      "id": "27189c3c-264f-4f8e-b567-85659f42b6c2",
+      "position": [
+        1776,
+        848
+      ],
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "notesInFlow": true,
+      "notes": "Fails explicitly on a conflicting/nonexistent product. On success, runs the normal lookup again; only a uniquely resolved mapping reaches the KNOWN branch."
     }
   ],
   "pinData": {
     "When clicking ‘Execute workflow’": [
-      {
-        "json": {
-          "id": "1a183cfe292d13e9",
-          "threadId": "1a183cfe292d13e9",
-          "snippet": "Horrifying things come in 3s! Humble Bundle Save big on a curated collection of horror games that celebrate the season by delivering exceptional scares! Take on FEAR 1-3, where you play as a First",
-          "payload": {
-            "mimeType": "text/html"
-          },
-          "sizeEstimate": 35426,
-          "historyId": "29088688",
-          "internalDate": "1793212800000",
-          "labels": [
-            {
-              "id": "INBOX",
-              "name": "INBOX"
-            },
-            {
-              "id": "CATEGORY_PROMOTIONS",
-              "name": "CATEGORY_PROMOTIONS"
-            },
-            {
-              "id": "UNREAD",
-              "name": "UNREAD"
-            }
-          ],
-          "Subject": "Play the F.E.A.R. series and more with the Horror Trifectas Bundle!",
-          "From": "Humble Bundle <contact@mailer.humblebundle.com>",
-          "To": "gonzalogarcia243@gmail.com"
-        }
-      },
-      {
-        "json": {
-          "id": "1a183ca4b92d90e9",
-          "threadId": "1a183ca4b92d90e9",
-          "snippet": "Dein PAYBACK Service ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌",
-          "payload": {
-            "mimeType": "multipart/alternative"
-          },
-          "sizeEstimate": 107558,
-          "historyId": "29088583",
-          "internalDate": "1793212434000",
-          "labels": [
-            {
-              "id": "INBOX",
-              "name": "INBOX"
-            },
-            {
-              "id": "IMPORTANT",
-              "name": "IMPORTANT"
-            },
-            {
-              "id": "CATEGORY_UPDATES",
-              "name": "CATEGORY_UPDATES"
-            },
-            {
-              "id": "UNREAD",
-              "name": "UNREAD"
-            }
-          ],
-          "To": "gonzalogarcia243@gmail.com",
-          "From": "PAYBACK Service <service@payback.de>",
-          "Subject": "2 Joker-Coupons als Dankeschön für deinen EDEKA-Einkauf!"
-        }
-      },
       {
         "json": {
           "id": "1a183c97e549e71b",
@@ -718,6 +981,71 @@
           "Subject": "EDEKA - Vielen Dank für Ihren Einkauf",
           "To": "gonzalogarcia243@gmail.com",
           "From": "EDEKA <noreply@app.edeka.de>"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "id": "1a1a294376db303b",
+          "threadId": "1a1a294376db303b",
+          "snippet": "Hallo Gonzalo Garcia, vielen Dank für deinen Einkauf mit der EDEKA App! Einen digitalen Kassenzettel für diesen Einkauf findest du als PDF-Anhang in dieser E-Mail*. In der EDEKA App kannst du alle",
+          "payload": {
+            "mimeType": "multipart/mixed"
+          },
+          "sizeEstimate": 25160,
+          "historyId": "29140958",
+          "internalDate": "1793728977000",
+          "labels": [
+            {
+              "id": "INBOX",
+              "name": "INBOX"
+            },
+            {
+              "id": "CATEGORY_UPDATES",
+              "name": "CATEGORY_UPDATES"
+            },
+            {
+              "id": "UNREAD",
+              "name": "UNREAD"
+            }
+          ],
+          "Subject": "EDEKA - Vielen Dank für Ihren Einkauf",
+          "To": "gonzalogarcia243@gmail.com",
+          "From": "EDEKA <noreply@app.edeka.de>"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "id": "1a1967c90ddf5ea7",
+          "threadId": "1a1967c90ddf5ea7",
+          "snippet": "Sent from my iPhone Begin forwarded message: From: EDEKA &lt;noreply@app.edeka.de&gt; Date: 30. October 2026 at 16:58:23 CET To: ariel-azi@hotmail.com Subject: EDEKA - Vielen Dank für Ihren Einkauf",
+          "payload": {
+            "mimeType": "multipart/mixed"
+          },
+          "sizeEstimate": 37020,
+          "historyId": "29121979",
+          "internalDate": "1793526106000",
+          "labels": [
+            {
+              "id": "INBOX",
+              "name": "INBOX"
+            },
+            {
+              "id": "CATEGORY_PERSONAL",
+              "name": "CATEGORY_PERSONAL"
+            }
+          ],
+          "From": "Ariel Aziernicki <ariel-azi@hotmail.com>",
+          "To": "\"gonzalogarcia243@gmail.com\" <gonzalogarcia243@gmail.com>",
+          "Subject": "Fwd: EDEKA - Vielen Dank für Ihren Einkauf"
+        },
+        "pairedItem": {
+          "item": 0
         }
       }
     ]
@@ -745,18 +1073,17 @@
   "staticData": {
     "node:Gmail Trigger": {
       "Gmail Trigger": {
-        "lastTimeChecked": 1794008730,
+        "lastTimeChecked": 1794083498,
         "pendingMessageIds": [],
         "noProgressTicks": 0,
         "possibleDuplicates": [
-          "1a1b340d72bc85fe",
-          "1a1b3f9daeafd439"
+          "1a1b7b5aa99f7cb7"
         ]
       }
     }
   },
   "tags": [],
   "triggerCount": 1,
-  "updatedAt": "2026-11-06T17:58:17.539Z",
-  "versionId": "048e07ae-3a02-4b23-8c57-86b6fb56251a"
+  "updatedAt": "2026-11-07T23:07:58.053Z",
+  "versionId": "a8c9f597-3271-4317-9630-821f7189cdac"
 }
