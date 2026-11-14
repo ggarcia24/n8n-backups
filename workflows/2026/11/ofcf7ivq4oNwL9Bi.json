@@ -1,7 +1,7 @@
 {
   "active": true,
   "activeVersion": {
-    "versionId": "fc0ff889-612a-48a7-a418-86c1e74d54b1",
+    "versionId": "fc155da7-6e33-42fa-8630-a82fff81a417",
     "workflowId": "ofcf7ivq4oNwL9Bi",
     "nodes": [
       {
@@ -183,6 +183,47 @@
       {
         "parameters": {
           "method": "POST",
+          "url": "https://notify.ggarcia24.work/purchases",
+          "authentication": "genericCredentialType",
+          "genericAuthType": "httpBearerAuth",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "X-Title",
+                "value": "Edeka Purchase"
+              }
+            ]
+          },
+          "sendBody": true,
+          "contentType": "raw",
+          "rawContentType": "text/html",
+          "body": "=You need to review these:\n\n{{ $json.data.map(item => {\n        return \"https://ticket-review.gonzalogarcia.me\" + item.review_path + \"\\n\"\n}) }}",
+          "options": {
+            "batching": {
+              "batch": {}
+            }
+          }
+        },
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.5,
+        "position": [
+          2512,
+          496
+        ],
+        "id": "aa90011c-9040-49af-99ad-b6cf76823af5",
+        "name": "HTTP Request",
+        "executeOnce": true,
+        "credentials": {
+          "httpBearerAuth": {
+            "id": "qICXH0s3niRMKXoP",
+            "name": "NTFY Token"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "method": "POST",
           "url": "http://192.168.178.145:8000/api/receipts",
           "authentication": "genericCredentialType",
           "genericAuthType": "httpBasicAuth",
@@ -198,13 +239,27 @@
           496
         ],
         "id": "4a801e9f-d9c1-4f72-b1b3-89684ce69dc0",
-        "name": "HTTP Request2",
+        "name": "Post to Ticket Reviewer",
         "credentials": {
           "httpBasicAuth": {
             "id": "Ae7vSZtYYCntP0gY",
             "name": "review username"
           }
         }
+      },
+      {
+        "parameters": {
+          "aggregate": "aggregateAllItemData",
+          "options": {}
+        },
+        "type": "n8n-nodes-base.aggregate",
+        "typeVersion": 1,
+        "position": [
+          2256,
+          496
+        ],
+        "id": "f244cc36-ffa9-4b9c-948b-e7b305834f7a",
+        "name": "Aggregate"
       }
     ],
     "connections": {
@@ -267,7 +322,7 @@
         "main": [
           [
             {
-              "node": "HTTP Request2",
+              "node": "Post to Ticket Reviewer",
               "type": "main",
               "index": 0
             }
@@ -306,17 +361,44 @@
             }
           ]
         ]
+      },
+      "Post to Ticket Reviewer": {
+        "main": [
+          [
+            {
+              "node": "Aggregate",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "HTTP Request": {
+        "main": [
+          []
+        ]
+      },
+      "Aggregate": {
+        "main": [
+          [
+            {
+              "node": "HTTP Request",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
       }
     },
     "nodeGroups": [],
     "authors": "Gonzalo Garcia",
-    "name": "Version fc0ff889",
+    "name": "Version fc155da7",
     "description": "",
     "autosaved": true,
-    "createdAt": "2026-11-10T21:30:42.012Z",
-    "updatedAt": "2026-11-10T21:32:38.000Z"
+    "createdAt": "2026-11-13T13:18:01.862Z",
+    "updatedAt": "2026-11-13T13:18:33.000Z"
   },
-  "activeVersionId": "fc0ff889-612a-48a7-a418-86c1e74d54b1",
+  "activeVersionId": "fc155da7-6e33-42fa-8630-a82fff81a417",
   "connections": {
     "Gmail Trigger": {
       "main": [
@@ -443,12 +525,25 @@
           }
         ]
       ]
+    },
+    "On form submission": {
+      "main": [
+        [
+          {
+            "node": "Tesseract",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "createdAt": "2026-11-10T00:00:49.087Z",
   "id": "ofcf7ivq4oNwL9Bi",
   "isArchived": false,
-  "meta": null,
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
   "name": "Edeka Purchases to Grocy",
   "nodeGroups": [],
   "nodes": [
@@ -646,7 +741,7 @@
         "sendBody": true,
         "contentType": "raw",
         "rawContentType": "text/html",
-        "body": "=You need to review these:\n\n{{ $json.data.map(item => {\n        return \"http://192.168.178.145:8000\" + item.review_path + \"\\n\"\n}) }}",
+        "body": "=You need to review these:\n\n{{ $json.data.map(item => {\n        return \"https://ticket-review.gonzalogarcia.me\" + item.review_path + \"\\n\"\n}) }}",
         "options": {
           "batching": {
             "batch": {}
@@ -708,6 +803,50 @@
       ],
       "id": "f244cc36-ffa9-4b9c-948b-e7b305834f7a",
       "name": "Aggregate"
+    },
+    {
+      "parameters": {
+        "formTitle": "Upload reciept",
+        "formDescription": "Please upload a picture of your ticket",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Reciept",
+              "fieldType": "file",
+              "fieldName": "ticket",
+              "acceptFileTypes": ".jpg,.png,.pdf"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.6,
+      "position": [
+        624,
+        768
+      ],
+      "id": "19b29704-27f4-4205-8bd6-ea7a1a6a59f3",
+      "name": "On form submission",
+      "webhookId": "08ba009d-9148-4807-bcc8-04f1ba5c5663"
+    },
+    {
+      "parameters": {
+        "inputDataFieldName": "=ticket",
+        "options": {
+          "language": "deu",
+          "psm": "SINGLE_COLUMN",
+          "minConfidence": 60
+        }
+      },
+      "type": "n8n-nodes-tesseractjs.tesseractNode",
+      "typeVersion": 1,
+      "position": [
+        848,
+        768
+      ],
+      "id": "692771c5-ee97-4328-88d5-1ef010093fdb",
+      "name": "Tesseract"
     }
   ],
   "pinData": {
@@ -859,6 +998,6 @@
   },
   "tags": [],
   "triggerCount": 1,
-  "updatedAt": "2026-11-10T22:14:11.252Z",
-  "versionId": "7017b09c-6740-45be-bde0-9b07a9c27625"
+  "updatedAt": "2026-11-13T14:01:29.541Z",
+  "versionId": "2ee5514f-9083-44f1-83b4-7f927ab1cc7a"
 }
