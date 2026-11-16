@@ -992,7 +992,14 @@
   "staticData": {
     "node:Gmail Trigger": {
       "Gmail Trigger": {
-        "lastTimeChecked": 1794346358
+        "lastTimeChecked": 1794809158,
+        "pendingMessageIds": [],
+        "noProgressTicks": 0,
+        "failedFetches": [],
+        "possibleDuplicates": [
+          "1a1e2f661f89471f",
+          "1a1e2f26fd71b0fe"
+        ]
       }
     }
   },
