@@ -1,7 +1,7 @@
 {
   "active": true,
   "activeVersion": {
-    "versionId": "15a8dd96-9f86-49a9-a80e-6821266fed42",
+    "versionId": "689e9182-621d-4a71-81fc-a191c235b68b",
     "workflowId": "X8ziv1mJ0BoORpSf",
     "nodes": [
       {
@@ -54,13 +54,13 @@
               {
                 "id": "2019c70b-82f5-4724-a66f-be1af75fbc03",
                 "name": "timezone",
-                "value": "Europe/Madrid",
+                "value": "Europe/Berlin",
                 "type": "string"
               },
               {
                 "id": "e5ca06ad-3247-455a-87db-fb9f15948bb5",
                 "name": "lookbackDays",
-                "value": 7,
+                "value": 10,
                 "type": "number"
               },
               {
@@ -574,13 +574,13 @@
     },
     "nodeGroups": [],
     "authors": "Gonzalo Garcia",
-    "name": "Version 15a8dd96",
+    "name": "Version 689e9182",
     "description": "",
-    "autosaved": true,
-    "createdAt": "2026-10-29T18:10:10.837Z",
-    "updatedAt": "2026-10-29T21:43:36.000Z"
+    "autosaved": false,
+    "createdAt": "2026-11-18T16:16:44.302Z",
+    "updatedAt": "2026-11-18T16:16:59.000Z"
   },
-  "activeVersionId": "15a8dd96-9f86-49a9-a80e-6821266fed42",
+  "activeVersionId": "689e9182-621d-4a71-81fc-a191c235b68b",
   "connections": {
     "Manual preview": {
       "main": [
@@ -779,13 +779,13 @@
             {
               "id": "2019c70b-82f5-4724-a66f-be1af75fbc03",
               "name": "timezone",
-              "value": "Europe/Madrid",
+              "value": "Europe/Berlin",
               "type": "string"
             },
             {
               "id": "e5ca06ad-3247-455a-87db-fb9f15948bb5",
               "name": "lookbackDays",
-              "value": 7,
+              "value": 10,
               "type": "number"
             },
             {
@@ -1189,6 +1189,6 @@
   },
   "tags": [],
   "triggerCount": 1,
-  "updatedAt": "2026-10-29T18:10:10.836Z",
-  "versionId": "15a8dd96-9f86-49a9-a80e-6821266fed42"
+  "updatedAt": "2026-11-18T16:16:44.301Z",
+  "versionId": "689e9182-621d-4a71-81fc-a191c235b68b"
 }
